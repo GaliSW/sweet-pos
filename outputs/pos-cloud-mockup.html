@@ -1,0 +1,1687 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>POS Cloud Mockup</title>
+  <style>
+    :root {
+      --ink: #1f2933;
+      --muted: #64748b;
+      --line: #d9e2ec;
+      --surface: #ffffff;
+      --soft: #f6f8fb;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --amber: #f59e0b;
+      --rose: #e11d48;
+      --blue: #2563eb;
+      --green: #16a34a;
+      --shadow: 0 12px 30px rgba(31, 41, 51, 0.08);
+      font-family: "Inter", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #eef2f6;
+      min-height: 100vh;
+    }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      border: 0;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), #155e75);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+
+    .brand p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .mode-tabs {
+      display: flex;
+      gap: 8px;
+      padding: 4px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .mode-tabs button,
+    .nav-button {
+      min-height: 38px;
+      border-radius: 7px;
+      padding: 0 13px;
+      color: var(--muted);
+      background: transparent;
+      font-weight: 700;
+    }
+
+    .mode-tabs button.active,
+    .nav-button.active {
+      color: white;
+      background: var(--accent);
+    }
+
+    .manager-entry {
+      min-height: 46px;
+      border-radius: 8px;
+      padding: 0 14px;
+      color: var(--ink);
+      background: #e2e8f0;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .manager-entry.active {
+      color: white;
+      background: #1f2937;
+    }
+
+    .workspace {
+      padding: 16px;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .pos-layout {
+      display: grid;
+      grid-template-columns: 112px minmax(0, 1fr) 360px;
+      gap: 14px;
+      height: calc(100vh - 86px);
+      min-height: 680px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .category-rail {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .category-btn {
+      min-height: 86px;
+      border-radius: 8px;
+      background: var(--soft);
+      color: var(--ink);
+      font-weight: 800;
+      border: 1px solid var(--line);
+    }
+
+    .category-btn.active {
+      background: #d9f3ef;
+      border-color: #7dd3c7;
+      color: var(--accent-strong);
+    }
+
+    .product-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-header h2,
+    .panel-header h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 28px;
+      border-radius: 999px;
+      padding: 0 10px;
+      background: var(--soft);
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .product-grid {
+      padding: 14px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
+      gap: 10px;
+      overflow: auto;
+      align-content: start;
+    }
+
+    .product-btn {
+      min-height: 112px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid var(--line);
+      padding: 12px;
+      text-align: left;
+      display: grid;
+      align-content: space-between;
+      transition: transform 140ms ease, border-color 140ms ease;
+    }
+
+    .product-btn:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+    }
+
+    .product-name {
+      font-size: 15px;
+      line-height: 1.35;
+      font-weight: 800;
+    }
+
+    .product-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .product-rule {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .price {
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--accent-strong);
+    }
+
+    .cart-panel {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+    }
+
+    .cart-list {
+      padding: 12px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .cart-row {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      background: #fff;
+    }
+
+    .cart-row-top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .cart-row strong {
+      font-size: 14px;
+      line-height: 1.3;
+    }
+
+    .qty-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--soft);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      font-weight: 900;
+    }
+
+    .cart-row-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .cart-components {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .checkout {
+      border-top: 1px solid var(--line);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      background: #fbfcfe;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+    }
+
+    .field label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 10px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .totals {
+      display: grid;
+      gap: 6px;
+      border-top: 1px dashed var(--line);
+      padding-top: 10px;
+    }
+
+    .total-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .total-line.grand {
+      color: var(--ink);
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .primary-action {
+      min-height: 52px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: white;
+      font-weight: 900;
+      font-size: 17px;
+    }
+
+    .primary-action:disabled {
+      cursor: not-allowed;
+      background: #94a3b8;
+    }
+
+    .secondary-action {
+      min-height: 42px;
+      border-radius: 8px;
+      background: #e2e8f0;
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .admin-layout {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 14px;
+      min-height: calc(100vh - 86px);
+    }
+
+    .admin-nav {
+      padding: 12px;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      position: sticky;
+      top: 84px;
+      height: calc(100vh - 100px);
+    }
+
+    .nav-button {
+      width: 100%;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      background: transparent;
+    }
+
+    .admin-main {
+      display: grid;
+      gap: 14px;
+    }
+
+    .admin-page {
+      display: none;
+      gap: 14px;
+    }
+
+    .admin-page.active {
+      display: grid;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .section-title p {
+      margin: 4px 0 0;
+      color: var(--muted);
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .kpi {
+      padding: 14px;
+      min-height: 118px;
+    }
+
+    .kpi span {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .kpi strong {
+      display: block;
+      margin-top: 10px;
+      font-size: 26px;
+      line-height: 1;
+    }
+
+    .kpi small {
+      display: block;
+      margin-top: 10px;
+      color: var(--green);
+      font-weight: 800;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 14px;
+    }
+
+    .data-card {
+      padding: 14px;
+    }
+
+    .data-card h3 {
+      margin: 0 0 12px;
+      font-size: 17px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 11px 9px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .bar-track {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      border-radius: inherit;
+      background: var(--accent);
+    }
+
+    .status {
+      display: inline-flex;
+      min-height: 26px;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0 9px;
+      font-size: 12px;
+      font-weight: 800;
+      background: #e0f2fe;
+      color: #075985;
+      white-space: nowrap;
+    }
+
+    .status.warn {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .toolbar .field {
+      min-width: 150px;
+    }
+
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(120px, 1fr));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .day {
+      min-height: 126px;
+      padding: 9px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      align-content: start;
+      gap: 7px;
+    }
+
+    .day:nth-child(7n) {
+      border-right: 0;
+    }
+
+    .day-number {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .shift {
+      border-radius: 7px;
+      padding: 7px;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.35;
+      background: #d9f3ef;
+      color: var(--accent-strong);
+    }
+
+    .month-calendar {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(132px, 1fr));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .month-day {
+      min-height: 132px;
+      padding: 8px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      align-content: start;
+      gap: 6px;
+    }
+
+    .month-day:nth-child(7n) {
+      border-right: 0;
+    }
+
+    .month-day .shift {
+      background: #eef6ff;
+      color: #1d4ed8;
+    }
+
+    .month-day .shift.evening {
+      background: #fff7ed;
+      color: #c2410c;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .inventory-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .count-row {
+      display: grid;
+      grid-template-columns: 1fr 104px 104px;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .count-row input {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0 9px;
+    }
+
+    .discount-row,
+    .counter-row,
+    .product-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .row-title {
+      font-weight: 900;
+    }
+
+    .row-sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 3px;
+    }
+
+    .mobile-note {
+      display: none;
+      margin: 0 0 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.46);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .gift-modal {
+      width: min(720px, 100%);
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      background: var(--surface);
+      border-radius: 8px;
+      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.25);
+      border: 1px solid var(--line);
+    }
+
+    .modal-head,
+    .modal-foot {
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-foot {
+      border-top: 1px solid var(--line);
+      border-bottom: 0;
+      background: #fbfcfe;
+    }
+
+    .modal-head h3 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .modal-body {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .flavor-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 8px;
+    }
+
+    .flavor-btn {
+      min-height: 48px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      font-weight: 800;
+      padding: 8px 10px;
+      text-align: left;
+    }
+
+    .flavor-btn.selected {
+      background: #d9f3ef;
+      border-color: var(--accent);
+      color: var(--accent-strong);
+    }
+
+    .fixed-flavors {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    @media (max-width: 1080px) {
+      .pos-layout {
+        grid-template-columns: 88px minmax(0, 1fr);
+        grid-template-rows: minmax(420px, 1fr) auto;
+        height: auto;
+      }
+
+      .cart-panel {
+        grid-column: 1 / -1;
+      }
+
+      .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .content-grid,
+      .settings-grid,
+      .inventory-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .calendar {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+      }
+
+      .month-calendar {
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+      }
+    }
+
+    @media (max-width: 760px) {
+      .topbar {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .mode-tabs {
+        width: 100%;
+      }
+
+      .top-actions {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .mode-tabs button {
+        flex: 1;
+      }
+
+      .workspace {
+        padding: 10px;
+      }
+
+      .pos-layout {
+        grid-template-columns: 1fr;
+        min-height: 0;
+      }
+
+      .category-rail {
+        flex-direction: row;
+      }
+
+      .category-btn {
+        min-height: 58px;
+        flex: 1;
+      }
+
+      .product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .admin-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .admin-nav {
+        position: static;
+        height: auto;
+        display: flex;
+        overflow: auto;
+      }
+
+      .nav-button {
+        min-width: 112px;
+      }
+
+      .kpi-grid,
+      .form-grid,
+      .count-row {
+        grid-template-columns: 1fr;
+      }
+
+      .calendar {
+        grid-template-columns: 1fr;
+      }
+
+      .month-calendar {
+        grid-template-columns: 1fr;
+      }
+
+      .mobile-note {
+        display: block;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">糖</div>
+        <div>
+          <h1>櫃位 POS Cloud Mockup</h1>
+          <p>員工前台、班表、庫存盤點 + 店長獨立後台</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <nav class="mode-tabs" aria-label="員工功能">
+          <button class="active" data-screen="pos">前台 POS</button>
+          <button data-screen="staff-schedule">我的班表</button>
+          <button data-screen="inventory">庫存盤點</button>
+        </nav>
+        <button class="manager-entry" id="manager-entry">店長登入</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="screen active" id="screen-pos">
+        <p class="mobile-note">手機版會把商品、購物車、結帳區上下排列；平板橫向時會是最適合櫃位操作的三欄版。</p>
+        <div class="pos-layout">
+          <aside class="panel category-rail" aria-label="商品分類">
+            <button class="category-btn active" data-category="bags">袋裝</button>
+            <button class="category-btn" data-category="boxes">禮盒</button>
+            <button class="category-btn" data-category="popular">常用</button>
+          </aside>
+
+          <section class="panel product-panel">
+            <div class="panel-header">
+              <div>
+                <h2 id="category-title">袋裝商品</h2>
+                <span class="pill">點商品即可加入訂單</span>
+              </div>
+              <span class="pill">櫃位 A · 林小安</span>
+            </div>
+            <div class="product-grid" id="product-grid"></div>
+          </section>
+
+          <aside class="panel cart-panel">
+            <div class="panel-header">
+              <div>
+                <h3>目前訂單</h3>
+                <span class="pill">訂單 #A-1028</span>
+              </div>
+              <button class="secondary-action" id="clear-cart">清空</button>
+            </div>
+
+            <div class="cart-list" id="cart-list"></div>
+
+            <div class="checkout">
+              <div class="field-row">
+                <div class="field">
+                  <label for="discount-select">折扣</label>
+                  <select id="discount-select">
+                    <option value="0">無折扣</option>
+                    <option value="0.9">會員 9 折</option>
+                    <option value="0.85">活動 85 折</option>
+                    <option value="fixed100">滿千折 100</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="payment-select">付款</label>
+                  <select id="payment-select">
+                    <option>現金</option>
+                    <option>信用卡</option>
+                    <option>LINE Pay</option>
+                    <option>街口支付</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div class="field">
+                  <label for="seller-select">銷售人員</label>
+                  <select id="seller-select">
+                    <option>林小安</option>
+                    <option>王志明</option>
+                    <option>陳怡君</option>
+                  </select>
+                </div>
+              </div>
+              <div class="totals">
+                <div class="total-line"><span>銷售金額</span><strong id="subtotal">$0</strong></div>
+                <div class="total-line"><span>折扣後金額</span><strong id="discounted-total">$0</strong></div>
+                <div class="total-line grand"><span>應收 / 實收</span><strong id="grand-total">$0</strong></div>
+              </div>
+              <button class="primary-action" id="complete-order">完成訂單</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-staff-schedule">
+        <div class="admin-main">
+          <div class="section-title">
+            <div>
+              <h2>我的班表</h2>
+              <p>員工只能查看自己的排班與櫃位，不進入店長排班薪資管理。</p>
+            </div>
+            <div class="toolbar">
+              <span class="pill">林小安</span>
+              <span class="pill">2026 年 7 月</span>
+            </div>
+          </div>
+          <div class="content-grid">
+            <div class="panel data-card">
+              <h3>本週班表</h3>
+              <div class="calendar">
+                <div class="day"><span class="day-number">一 1</span><div class="shift">休假</div></div>
+                <div class="day"><span class="day-number">二 2</span><div class="shift">櫃位 A<br>10:00-18:00</div></div>
+                <div class="day"><span class="day-number">三 3</span><div class="shift">櫃位 A<br>10:00-18:00</div></div>
+                <div class="day"><span class="day-number">四 4</span><div class="shift">休假</div></div>
+                <div class="day"><span class="day-number">五 5</span><div class="shift">櫃位 B<br>12:00-21:00</div></div>
+                <div class="day"><span class="day-number">六 6</span><div class="shift">櫃位 A<br>10:00-21:00</div></div>
+                <div class="day"><span class="day-number">日 7</span><div class="shift">快閃櫃<br>10:00-21:00</div></div>
+              </div>
+            </div>
+            <div class="panel data-card">
+              <h3>今日提醒</h3>
+              <div class="product-row"><div><div class="row-title">上班前盤點</div><div class="row-sub">開班後先到庫存盤點頁確認期初數量。</div></div><span class="status warn">待完成</span></div>
+              <div class="product-row"><div><div class="row-title">櫃位 A</div><div class="row-sub">今日目標 $12,000，排班 10:00-21:00。</div></div><span class="status">已排班</span></div>
+              <div class="product-row"><div><div class="row-title">下班庫存</div><div class="row-sub">結束營業後填寫期末、試吃、報廢與差異備註。</div></div><span class="status warn">收班時</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-inventory">
+        <div class="admin-main">
+          <div class="section-title">
+            <div>
+              <h2>櫃位庫存盤點</h2>
+              <p>櫃位員工上班做開班盤點，下班做期末庫存；進貨、試吃、報廢都留下異動紀錄。</p>
+            </div>
+            <div class="toolbar">
+              <span class="pill">櫃位 A</span>
+              <span class="pill">今日班次 10:00-21:00</span>
+            </div>
+          </div>
+          <div class="kpi-grid">
+            <div class="panel kpi"><span>待盤品項</span><strong>18</strong><small>含袋裝與禮盒</small></div>
+            <div class="panel kpi"><span>今日進貨</span><strong>36</strong><small>3 筆補貨</small></div>
+            <div class="panel kpi"><span>試吃 / 報廢</span><strong>5</strong><small>需填原因</small></div>
+            <div class="panel kpi"><span>庫存差異</span><strong>-2</strong><small style="color:var(--rose)">待店長確認</small></div>
+          </div>
+          <div class="inventory-grid">
+            <div class="panel data-card">
+              <h3>盤點模式</h3>
+              <div class="form-grid">
+                <div class="field"><label>盤點類型</label><select><option>開班盤點</option><option>下班盤點</option><option>臨時盤點</option></select></div>
+                <div class="field"><label>櫃位</label><select><option>櫃位 A</option><option>櫃位 B</option><option>快閃櫃</option></select></div>
+                <div class="field"><label>異動類型</label><select><option>盤點</option><option>進貨</option><option>試吃</option><option>報廢</option><option>調整</option></select></div>
+                <div class="field"><label>備註</label><input value="晚班收班盤點"></div>
+              </div>
+              <div style="height:12px"></div>
+              <button class="primary-action">儲存盤點紀錄</button>
+            </div>
+            <div class="panel data-card">
+              <h3>品項盤點</h3>
+              <div class="count-row"><strong>品項</strong><strong>系統數</strong><strong>實盤數</strong></div>
+              <div class="count-row"><div><div class="row-title">包種烏龍牛軋糖</div><div class="row-sub">袋裝 10入/袋</div></div><input value="24"><input value="24"></div>
+              <div class="count-row"><div><div class="row-title">草莓牛軋糖</div><div class="row-sub">袋裝 10入/袋</div></div><input value="18"><input value="17"></div>
+              <div class="count-row"><div><div class="row-title">小禮盒</div><div class="row-sub">禮盒庫存，不拆口味計價</div></div><input value="10"><input value="10"></div>
+              <div class="count-row"><div><div class="row-title">大禮盒</div><div class="row-sub">自選 8 口味 + 蔥餅</div></div><input value="8"><input value="7"></div>
+              <div class="count-row"><div><div class="row-title">發禮盒</div><div class="row-sub">固定四口味</div></div><input value="5"><input value="5"></div>
+            </div>
+          </div>
+          <div class="panel data-card">
+            <h3>今日庫存異動</h3>
+            <table>
+              <thead><tr><th>時間</th><th>類型</th><th>品項</th><th>數量</th><th>人員</th><th>備註</th></tr></thead>
+              <tbody>
+                <tr><td>10:05</td><td>開班盤點</td><td>全部品項</td><td>-</td><td>林小安</td><td>期初確認</td></tr>
+                <tr><td>13:20</td><td>試吃</td><td>蔓越莓牛軋糖</td><td>-2</td><td>林小安</td><td>試吃盤補充</td></tr>
+                <tr><td>16:40</td><td>進貨</td><td>大禮盒</td><td>+6</td><td>王志明</td><td>倉庫補貨</td></tr>
+                <tr><td>20:55</td><td>報廢</td><td>草莓牛軋糖</td><td>-1</td><td>林小安</td><td>外包裝破損</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-admin">
+        <div class="admin-layout">
+          <aside class="panel admin-nav" aria-label="後台導覽">
+            <button class="nav-button active" data-admin-page="dashboard">總覽</button>
+            <button class="nav-button" data-admin-page="reports">報表</button>
+            <button class="nav-button" data-admin-page="schedule">排班薪資</button>
+            <button class="nav-button" data-admin-page="inventory">庫存管理</button>
+            <button class="nav-button" data-admin-page="catalog">商品折扣</button>
+            <button class="nav-button" data-admin-page="counters">櫃位設定</button>
+          </aside>
+
+          <div class="admin-main">
+            <section class="admin-page active" id="admin-dashboard">
+              <div class="section-title">
+                <div>
+                  <h2>今日營運總覽</h2>
+                  <p>店長一進後台先看到營收、金流、客單與櫃位達成狀態。</p>
+                </div>
+                <div class="toolbar">
+                  <span class="pill">2026/07/05</span>
+                  <span class="pill">全部櫃位</span>
+                </div>
+              </div>
+              <div class="kpi-grid">
+                <div class="panel kpi"><span>總業績</span><strong>$42,860</strong><small>較昨日 +8.4%</small></div>
+                <div class="panel kpi"><span>實際金流</span><strong>$41,960</strong><small>現金差額 $0</small></div>
+                <div class="panel kpi"><span>平均客單價</span><strong>$1,071</strong><small>40 筆訂單</small></div>
+                <div class="panel kpi"><span>月目標達成</span><strong>68%</strong><small>櫃位 A 領先</small></div>
+              </div>
+              <div class="content-grid">
+                <div class="panel data-card">
+                  <h3>每日員工業績</h3>
+                  <table>
+                    <thead><tr><th>員工</th><th>訂單</th><th>銷售金額</th><th>抽成</th><th>付款異常</th></tr></thead>
+                    <tbody>
+                      <tr><td>林小安</td><td>18</td><td>$18,500</td><td>$370</td><td><span class="status">正常</span></td></tr>
+                      <tr><td>王志明</td><td>12</td><td>$12,260</td><td>$245</td><td><span class="status">正常</span></td></tr>
+                      <tr><td>陳怡君</td><td>10</td><td>$12,100</td><td>$242</td><td><span class="status warn">待對帳</span></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="panel data-card">
+                  <h3>櫃位月目標</h3>
+                  <table>
+                    <thead><tr><th>櫃位</th><th>目標</th><th>達成</th></tr></thead>
+                    <tbody>
+                      <tr><td>櫃位 A</td><td>$300,000</td><td><div class="bar-track"><div class="bar" style="width:78%"></div></div></td></tr>
+                      <tr><td>櫃位 B</td><td>$260,000</td><td><div class="bar-track"><div class="bar" style="width:62%"></div></div></td></tr>
+                      <tr><td>快閃櫃</td><td>$120,000</td><td><div class="bar-track"><div class="bar" style="width:44%; background:var(--amber)"></div></div></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section class="admin-page" id="admin-reports">
+              <div class="section-title">
+                <div>
+                  <h2>報表中心</h2>
+                  <p>以每日、每月、員工、櫃位切換，對應銷售與實際金流。</p>
+                </div>
+                <div class="toolbar">
+                  <div class="field"><select><option>本月</option><option>今日</option><option>自訂區間</option></select></div>
+                  <div class="field"><select><option>全部櫃位</option><option>櫃位 A</option><option>櫃位 B</option></select></div>
+                </div>
+              </div>
+              <div class="kpi-grid">
+                <div class="panel kpi"><span>月營收金額</span><strong>$216,400</strong><small>含折扣後銷售</small></div>
+                <div class="panel kpi"><span>實際金流</span><strong>$214,800</strong><small>現金/刷卡/電子支付</small></div>
+                <div class="panel kpi"><span>總訂單數</span><strong>204</strong><small>平均 $1,061</small></div>
+                <div class="panel kpi"><span>折扣使用</span><strong>72</strong><small>會員 9 折最多</small></div>
+              </div>
+              <div class="panel data-card">
+                <h3>每月每位員工業績</h3>
+                <table>
+                  <thead><tr><th>員工</th><th>櫃位</th><th>銷售金額</th><th>實收金流</th><th>平均客單</th><th>目標貢獻</th></tr></thead>
+                  <tbody>
+                    <tr><td>林小安</td><td>櫃位 A</td><td>$86,200</td><td>$85,700</td><td>$1,140</td><td>28.7%</td></tr>
+                    <tr><td>王志明</td><td>櫃位 A</td><td>$64,100</td><td>$63,900</td><td>$1,018</td><td>21.4%</td></tr>
+                    <tr><td>陳怡君</td><td>櫃位 B</td><td>$66,100</td><td>$65,200</td><td>$1,049</td><td>25.4%</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="admin-page" id="admin-schedule">
+              <div class="section-title">
+                <div>
+                  <h2>每月排班與薪資</h2>
+                  <p>店長以月曆安排每日兩班制，系統用排班時數、時薪與每日抽成試算薪資。</p>
+                </div>
+                <button class="primary-action" style="min-height:42px; padding:0 14px;">新增班次</button>
+              </div>
+              <div class="inventory-grid">
+                <div class="panel data-card">
+                  <h3>2026 年 7 月排班</h3>
+                  <div class="toolbar" style="margin-bottom:12px;">
+                    <div class="field"><select><option>櫃位 A</option><option>櫃位 B</option><option>快閃櫃</option></select></div>
+                    <div class="field"><select><option>2026 年 7 月</option><option>2026 年 8 月</option></select></div>
+                    <button class="secondary-action" style="padding:0 12px;">套用上月班表</button>
+                  </div>
+                  <div class="month-calendar">
+                    <div class="month-day"><span class="day-number">一 1</span><div class="shift">早 10-16<br>林小安 · A</div><div class="shift evening">晚 16-22<br>王志明 · A</div></div>
+                    <div class="month-day"><span class="day-number">二 2</span><div class="shift">早 10-16<br>王志明 · A</div><div class="shift evening">晚 16-22<br>陳怡君 · A</div></div>
+                    <div class="month-day"><span class="day-number">三 3</span><div class="shift">早 10-16<br>林小安 · A</div><div class="shift evening">晚 16-22<br>陳怡君 · B</div></div>
+                    <div class="month-day"><span class="day-number">四 4</span><div class="shift">早 10-16<br>王志明 · A</div><div class="shift evening">晚 16-22<br>林小安 · A</div></div>
+                    <div class="month-day"><span class="day-number">五 5</span><div class="shift">早 10-16<br>陳怡君 · B</div><div class="shift evening">晚 16-22<br>王志明 · A</div></div>
+                    <div class="month-day"><span class="day-number">六 6</span><div class="shift">早 10-16<br>林小安 · A</div><div class="shift evening">晚 16-22<br>陳怡君 · 快閃</div></div>
+                    <div class="month-day"><span class="day-number">日 7</span><div class="shift">早 10-16<br>王志明 · A</div><div class="shift evening">晚 16-22<br>林小安 · 快閃</div></div>
+                    <div class="month-day"><span class="day-number">一 8</span><div class="shift">早 10-16<br>林小安 · A</div><div class="shift evening">晚 16-22<br>王志明 · A</div></div>
+                    <div class="month-day"><span class="day-number">二 9</span><div class="shift">早 10-16<br>陳怡君 · B</div><div class="shift evening">晚 16-22<br>林小安 · A</div></div>
+                    <div class="month-day"><span class="day-number">三 10</span><div class="shift">早 10-16<br>王志明 · A</div><div class="shift evening">晚 16-22<br>陳怡君 · B</div></div>
+                    <div class="month-day"><span class="day-number">四 11</span><div class="shift">早 10-16<br>林小安 · A</div><div class="shift evening">晚 16-22<br>王志明 · A</div></div>
+                    <div class="month-day"><span class="day-number">五 12</span><div class="shift">早 10-16<br>陳怡君 · B</div><div class="shift evening">晚 16-22<br>林小安 · A</div></div>
+                    <div class="month-day"><span class="day-number">六 13</span><div class="shift">早 10-16<br>王志明 · 快閃</div><div class="shift evening">晚 16-22<br>陳怡君 · 快閃</div></div>
+                    <div class="month-day"><span class="day-number">日 14</span><div class="shift">早 10-16<br>林小安 · A</div><div class="shift evening">晚 16-22<br>王志明 · A</div></div>
+                  </div>
+                </div>
+                <div class="panel data-card">
+                  <h3>排班流程</h3>
+                  <div class="product-row"><div><div class="row-title">1. 選月份與櫃位</div><div class="row-sub">店長先選要排的月份，再切換櫃位 A / B / 快閃櫃。</div></div><span class="status">開始</span></div>
+                  <div class="product-row"><div><div class="row-title">2. 確認兩班制</div><div class="row-sub">預設早班 10:00-16:00、晚班 16:00-22:00，可作為固定班別模板。</div></div><span class="status">模板</span></div>
+                  <div class="product-row"><div><div class="row-title">3. 指派員工</div><div class="row-sub">在月曆每日早/晚班格子指定員工；一格代表一個班次。</div></div><span class="status">排班</span></div>
+                  <div class="product-row"><div><div class="row-title">4. 檢查衝突</div><div class="row-sub">系統提示同員工撞班、超時、櫃位缺班或未排滿。</div></div><span class="status warn">檢查</span></div>
+                  <div class="product-row"><div><div class="row-title">5. 發布班表</div><div class="row-sub">發布後員工只能在「我的班表」查看自己的班次。</div></div><span class="status">發布</span></div>
+                  <div class="product-row"><div><div class="row-title">6. 月底薪資試算</div><div class="row-sub">用排班時數 x 時薪，加上每日個人業績抽成。</div></div><span class="status">薪資</span></div>
+                  <h3 style="margin-top:18px;">班別與薪資試算</h3>
+                  <div class="product-row"><div><div class="row-title">早班</div><div class="row-sub">10:00-16:00 · 6 小時</div></div><span class="status">每日固定</span></div>
+                  <div class="product-row"><div><div class="row-title">晚班</div><div class="row-sub">16:00-22:00 · 6 小時</div></div><span class="status">每日固定</span></div>
+                  <div class="product-row"><div><div class="row-title">排班規則</div><div class="row-sub">每日兩班，每班指定員工與櫃位；薪資由排班時數 x 時薪 + 每日抽成。</div></div><span class="status">MVP</span></div>
+                  <table>
+                    <thead><tr><th>員工</th><th>時薪</th><th>時數</th><th>抽成</th><th>合計</th></tr></thead>
+                    <tbody>
+                      <tr><td>林小安</td><td>$190</td><td>96</td><td>$1,520</td><td>$19,760</td></tr>
+                      <tr><td>王志明</td><td>$185</td><td>84</td><td>$980</td><td>$16,520</td></tr>
+                      <tr><td>陳怡君</td><td>$190</td><td>72</td><td>$1,020</td><td>$14,700</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section class="admin-page" id="admin-inventory">
+              <div class="section-title">
+                <div>
+                  <h2>庫存管理</h2>
+                  <p>店長查看各櫃位庫存、盤點差異、進貨、試吃與報廢紀錄。</p>
+                </div>
+                <div class="toolbar">
+                  <div class="field"><select><option>全部櫃位</option><option>櫃位 A</option><option>櫃位 B</option><option>快閃櫃</option></select></div>
+                  <div class="field"><select><option>今日</option><option>本週</option><option>本月</option></select></div>
+                </div>
+              </div>
+              <div class="kpi-grid">
+                <div class="panel kpi"><span>庫存總品項</span><strong>24</strong><small>含袋裝/禮盒</small></div>
+                <div class="panel kpi"><span>低庫存警示</span><strong>3</strong><small style="color:var(--amber)">需補貨</small></div>
+                <div class="panel kpi"><span>盤點差異</span><strong>-$1,120</strong><small style="color:var(--rose)">待覆核</small></div>
+                <div class="panel kpi"><span>今日報廢</span><strong>4</strong><small>2 筆紀錄</small></div>
+              </div>
+              <div class="content-grid">
+                <div class="panel data-card">
+                  <h3>櫃位庫存彙總</h3>
+                  <table>
+                    <thead><tr><th>品項</th><th>櫃位 A</th><th>櫃位 B</th><th>快閃櫃</th><th>狀態</th></tr></thead>
+                    <tbody>
+                      <tr><td>包種烏龍牛軋糖</td><td>24</td><td>18</td><td>8</td><td><span class="status">正常</span></td></tr>
+                      <tr><td>草莓牛軋糖</td><td>17</td><td>9</td><td>4</td><td><span class="status warn">低庫存</span></td></tr>
+                      <tr><td>小禮盒</td><td>10</td><td>6</td><td>2</td><td><span class="status">正常</span></td></tr>
+                      <tr><td>大禮盒</td><td>7</td><td>4</td><td>1</td><td><span class="status warn">需補貨</span></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="panel data-card">
+                  <h3>待覆核差異</h3>
+                  <div class="product-row"><div><div class="row-title">櫃位 A · 大禮盒 -1</div><div class="row-sub">下班盤點少 1，林小安備註：疑似銷售未送出。</div></div><span class="status warn">待查</span></div>
+                  <div class="product-row"><div><div class="row-title">櫃位 B · 草莓牛軋糖 -2</div><div class="row-sub">試吃登記與盤點數不一致。</div></div><span class="status warn">待查</span></div>
+                  <div class="product-row"><div><div class="row-title">快閃櫃 · 進貨 +12</div><div class="row-sub">今日補貨已入櫃，等待店長確認。</div></div><span class="status">待確認</span></div>
+                </div>
+              </div>
+              <div class="panel data-card">
+                <h3>庫存異動明細</h3>
+                <table>
+                  <thead><tr><th>日期</th><th>櫃位</th><th>類型</th><th>品項</th><th>數量</th><th>員工</th><th>狀態</th></tr></thead>
+                  <tbody>
+                    <tr><td>07/05 10:05</td><td>A</td><td>開班盤點</td><td>全部品項</td><td>-</td><td>林小安</td><td><span class="status">完成</span></td></tr>
+                    <tr><td>07/05 13:20</td><td>A</td><td>試吃</td><td>蔓越莓牛軋糖</td><td>-2</td><td>林小安</td><td><span class="status">完成</span></td></tr>
+                    <tr><td>07/05 16:40</td><td>A</td><td>進貨</td><td>大禮盒</td><td>+6</td><td>王志明</td><td><span class="status">完成</span></td></tr>
+                    <tr><td>07/05 20:55</td><td>A</td><td>報廢</td><td>草莓牛軋糖</td><td>-1</td><td>林小安</td><td><span class="status warn">待覆核</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="admin-page" id="admin-catalog">
+              <div class="section-title">
+                <div>
+                  <h2>商品與折扣</h2>
+                  <p>價格、分類與折扣由店長維護；前台只顯示啟用中的項目。</p>
+                </div>
+                <button class="primary-action" style="min-height:42px; padding:0 14px;">新增商品</button>
+              </div>
+              <div class="settings-grid">
+                <div class="panel data-card">
+                  <h3>商品清單</h3>
+                  <div class="product-row"><div><div class="row-title">包種烏龍牛軋糖</div><div class="row-sub">袋裝 · 10入/袋 · $280</div></div><span class="status">啟用</span></div>
+                  <div class="product-row"><div><div class="row-title">草莓牛軋糖</div><div class="row-sub">袋裝 · 10入/袋 · $280</div></div><span class="status">啟用</span></div>
+                  <div class="product-row"><div><div class="row-title">小禮盒</div><div class="row-sub">禮盒 · 自選 3 個 6入口味 · 價格可調</div></div><span class="status">啟用</span></div>
+                  <div class="product-row"><div><div class="row-title">大禮盒</div><div class="row-sub">禮盒 · 自選 8 個 6入口味 + 1 個蔥餅 · 價格可調</div></div><span class="status">啟用</span></div>
+                  <div class="product-row"><div><div class="row-title">發禮盒</div><div class="row-sub">禮盒 · 固定 4 個 6入口味 · 價格可調</div></div><span class="status warn">季節</span></div>
+                  <div class="product-row"><div><div class="row-title">財禮盒</div><div class="row-sub">禮盒 · 固定 4 個 6入口味 · 價格可調</div></div><span class="status warn">季節</span></div>
+                </div>
+                <div class="panel data-card">
+                  <h3>折扣設定</h3>
+                  <div class="discount-row"><div><div class="row-title">會員 9 折</div><div class="row-sub">整筆訂單 x 90%</div></div><span class="status">啟用</span></div>
+                  <div class="discount-row"><div><div class="row-title">活動 85 折</div><div class="row-sub">整筆訂單 x 85%</div></div><span class="status">啟用</span></div>
+                  <div class="discount-row"><div><div class="row-title">滿千折 100</div><div class="row-sub">滿 $1000 折 $100</div></div><span class="status">啟用</span></div>
+                  <div class="discount-row"><div><div class="row-title">員工價</div><div class="row-sub">保留，需店長權限</div></div><span class="status warn">停用</span></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="admin-page" id="admin-counters">
+              <div class="section-title">
+                <div>
+                  <h2>櫃位設定</h2>
+                  <p>每個櫃位設定月目標；報表會用訂單櫃位歸屬計算達成率。</p>
+                </div>
+                <button class="primary-action" style="min-height:42px; padding:0 14px;">新增櫃位</button>
+              </div>
+              <div class="settings-grid">
+                <div class="panel data-card">
+                  <h3>櫃位列表</h3>
+                  <div class="counter-row"><div><div class="row-title">櫃位 A</div><div class="row-sub">台北車站 · 月目標 $300,000</div></div><span class="status">營業中</span></div>
+                  <div class="counter-row"><div><div class="row-title">櫃位 B</div><div class="row-sub">信義快閃 · 月目標 $260,000</div></div><span class="status">營業中</span></div>
+                  <div class="counter-row"><div><div class="row-title">快閃櫃</div><div class="row-sub">週末限定 · 月目標 $120,000</div></div><span class="status warn">短期</span></div>
+                </div>
+                <div class="panel data-card">
+                  <h3>抽成規則</h3>
+                  <table>
+                    <thead><tr><th>每日個人業績</th><th>抽成率</th><th>備註</th></tr></thead>
+                    <tbody>
+                      <tr><td>$0 - $2,999</td><td>0%</td><td>未達門檻</td></tr>
+                      <tr><td>$3,000 - $5,000</td><td>1%</td><td>以當日銷售額計</td></tr>
+                      <tr><td>$5,001 以上</td><td>2%</td><td>以當日銷售額計</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="gift-modal" aria-hidden="true">
+    <section class="gift-modal" role="dialog" aria-modal="true" aria-labelledby="gift-modal-title">
+      <div class="modal-head">
+        <div>
+          <h3 id="gift-modal-title">禮盒內容</h3>
+          <span class="pill" id="gift-modal-rule">選擇口味</span>
+        </div>
+        <button class="icon-btn" id="gift-modal-close" aria-label="關閉">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="total-line grand"><span id="gift-modal-price-label">禮盒價格</span><strong id="gift-modal-price">$0</strong></div>
+        <p class="row-sub" id="gift-modal-description">禮盒中的每個口味都是 6 入一袋，口味本身不另計價。</p>
+        <div class="flavor-grid" id="gift-flavor-grid"></div>
+        <div>
+          <div class="row-title">目前內容</div>
+          <div class="fixed-flavors" id="gift-selection-summary"></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <span class="pill" id="gift-selection-count">尚未選擇</span>
+        <button class="primary-action" id="gift-add-cart" style="min-height:44px; padding:0 16px;">加入訂單</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const giftFlavors = [
+      "經典原味牛軋糖",
+      "蔓越莓牛軋糖",
+      "草莓牛軋糖",
+      "芒果牛軋糖",
+      "無花果牛軋糖",
+      "紅玉18號紅茶牛軋糖",
+      "抹茶牛軋糖",
+      "包種烏龍牛軋糖",
+      "鐵觀音牛軋糖",
+      "咖啡牛軋糖",
+      "巧克力牛軋糖",
+      "可可碎語牛軋糖"
+    ];
+
+    const products = {
+      bags: [
+        { name: "包種烏龍牛軋糖", spec: "10入/袋", price: 280 },
+        { name: "蔓越莓牛軋糖", spec: "10入/袋", price: 280 },
+        { name: "草莓牛軋糖", spec: "10入/袋", price: 280 },
+        { name: "芒果牛軋糖", spec: "10入/袋", price: 280 },
+        { name: "無花果牛軋糖", spec: "10入/袋", price: 300 },
+        { name: "紅玉18號紅茶牛軋糖", spec: "10入/袋", price: 300 },
+        { name: "抹茶牛軋糖", spec: "10入/袋", price: 300 },
+        { name: "鐵觀音牛軋糖", spec: "10入/袋", price: 300 },
+        { name: "咖啡牛軋糖", spec: "10入/袋", price: 280 },
+        { name: "巧克力牛軋糖", spec: "10入/袋", price: 280 },
+        { name: "可可碎語牛軋糖", spec: "10入/袋", price: 320 },
+        { name: "經典原味牛軋餅", spec: "10入/袋", price: 260 },
+        { name: "經典原味蔥軋餅", spec: "9入/袋", price: 260 }
+      ],
+      boxes: [
+        { name: "小禮盒", spec: "自選 3 個口味 · 每味 6入/袋", price: 680, rule: "3 選口味", gift: { mode: "select", required: 3, fixed: [] } },
+        { name: "大禮盒", spec: "自選 8 個口味 + 1 個蔥餅", price: 980, rule: "8 選口味 + 蔥餅", gift: { mode: "select", required: 8, fixed: ["經典原味蔥軋餅 9入/袋"] } },
+        { name: "發禮盒", spec: "固定 4 個口味 · 每味 6入/袋", price: 1280, rule: "固定組合", gift: { mode: "fixed", fixed: ["包種烏龍牛軋糖 6入/袋", "蔓越莓牛軋糖 6入/袋", "草莓牛軋糖 6入/袋", "芒果牛軋糖 6入/袋"] } },
+        { name: "財禮盒", spec: "固定 4 個口味 · 每味 6入/袋", price: 1280, rule: "固定組合", gift: { mode: "fixed", fixed: ["紅玉18號紅茶牛軋糖 6入/袋", "抹茶牛軋糖 6入/袋", "鐵觀音牛軋糖 6入/袋", "咖啡牛軋糖 6入/袋"] } }
+      ],
+      popular: [
+        { name: "大禮盒", spec: "自選 8 個口味 + 1 個蔥餅", price: 980, rule: "8 選口味 + 蔥餅", gift: { mode: "select", required: 8, fixed: ["經典原味蔥軋餅 9入/袋"] } },
+        { name: "小禮盒", spec: "自選 3 個口味 · 每味 6入/袋", price: 680, rule: "3 選口味", gift: { mode: "select", required: 3, fixed: [] } },
+        { name: "包種烏龍牛軋糖", spec: "10入/袋", price: 280 },
+        { name: "蔓越莓牛軋糖", spec: "10入/袋", price: 280 },
+        { name: "經典原味牛軋餅", spec: "10入/袋", price: 260 },
+        { name: "發禮盒", spec: "固定 4 個口味 · 每味 6入/袋", price: 1280, rule: "固定組合", gift: { mode: "fixed", fixed: ["包種烏龍牛軋糖 6入/袋", "蔓越莓牛軋糖 6入/袋", "草莓牛軋糖 6入/袋", "芒果牛軋糖 6入/袋"] } }
+      ]
+    };
+
+    const titles = {
+      bags: "袋裝商品",
+      boxes: "禮盒商品",
+      popular: "常用商品"
+    };
+
+    const cart = new Map();
+    const formatter = new Intl.NumberFormat("zh-TW", { style: "currency", currency: "TWD", maximumFractionDigits: 0 });
+
+    const productGrid = document.querySelector("#product-grid");
+    const categoryTitle = document.querySelector("#category-title");
+    const cartList = document.querySelector("#cart-list");
+    const discountSelect = document.querySelector("#discount-select");
+    const managerEntry = document.querySelector("#manager-entry");
+    const giftModal = document.querySelector("#gift-modal");
+    const giftFlavorGrid = document.querySelector("#gift-flavor-grid");
+    const giftSelectionSummary = document.querySelector("#gift-selection-summary");
+    const giftSelectionCount = document.querySelector("#gift-selection-count");
+    const giftAddCart = document.querySelector("#gift-add-cart");
+    let activeGiftProduct = null;
+    let selectedFlavors = [];
+
+    function money(value) {
+      return formatter.format(value);
+    }
+
+    function renderProducts(category) {
+      categoryTitle.textContent = titles[category];
+      productGrid.innerHTML = products[category].map((product, index) => `
+        <button class="product-btn" data-category="${category}" data-index="${index}">
+          <span>
+            <span class="product-name">${product.name}</span>
+            ${product.rule ? `<span class="product-rule">${product.rule}</span>` : ""}
+          </span>
+          <span class="product-meta"><span>${product.spec}</span><span class="price">${money(product.price)}</span></span>
+        </button>
+      `).join("");
+    }
+
+    function flavorLabel(flavor) {
+      return `${flavor} 6入/袋`;
+    }
+
+    function addCartItem(item) {
+      const key = item.components?.length ? `${item.name}|${item.components.join(",")}` : item.name;
+      const existing = cart.get(key);
+      if (existing) existing.qty += 1;
+      else cart.set(key, { ...item, key, qty: 1 });
+      renderCart();
+    }
+
+    function openGiftModal(product) {
+      activeGiftProduct = product;
+      selectedFlavors = [];
+      document.querySelector("#gift-modal-title").textContent = product.name;
+      document.querySelector("#gift-modal-rule").textContent = product.rule;
+      document.querySelector("#gift-modal-price").textContent = money(product.price);
+      document.querySelector("#gift-modal-description").textContent =
+        product.gift.mode === "fixed"
+          ? "這個禮盒是固定四個口味；每個口味都是 6 入一袋，口味本身不另計價。"
+          : "請選擇禮盒口味；每個口味都是 6 入一袋，口味本身不另計價。";
+
+      if (product.gift.mode === "fixed") {
+        giftFlavorGrid.innerHTML = "";
+        selectedFlavors = [...product.gift.fixed];
+      } else {
+        giftFlavorGrid.innerHTML = giftFlavors.map(flavor => `
+          <button class="flavor-btn" data-flavor="${flavor}">${flavor}</button>
+        `).join("");
+      }
+
+      renderGiftSelection();
+      giftModal.classList.add("active");
+      giftModal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeGiftModal() {
+      giftModal.classList.remove("active");
+      giftModal.setAttribute("aria-hidden", "true");
+      activeGiftProduct = null;
+      selectedFlavors = [];
+    }
+
+    function renderGiftSelection() {
+      const fixedItems = activeGiftProduct?.gift.fixed || [];
+      const required = activeGiftProduct?.gift.required || selectedFlavors.length;
+      const displayItems = activeGiftProduct?.gift.mode === "fixed"
+        ? selectedFlavors
+        : [...selectedFlavors.map(flavorLabel), ...fixedItems];
+
+      giftSelectionSummary.innerHTML = displayItems.length
+        ? displayItems.map(item => `<span class="pill">${item}</span>`).join("")
+        : `<span class="pill">尚未選擇口味</span>`;
+
+      if (activeGiftProduct?.gift.mode === "fixed") {
+        giftSelectionCount.textContent = `固定 ${selectedFlavors.length} 個口味`;
+        giftAddCart.disabled = false;
+      } else {
+        giftSelectionCount.textContent = `已選 ${selectedFlavors.length} / ${required}`;
+        giftAddCart.disabled = selectedFlavors.length !== required;
+      }
+    }
+
+    function getDiscountedTotal(subtotal) {
+      const discount = discountSelect.value;
+      if (discount === "fixed100") return subtotal >= 1000 ? subtotal - 100 : subtotal;
+      const rate = Number(discount);
+      return rate ? Math.round(subtotal * rate) : subtotal;
+    }
+
+    function renderCart() {
+      const items = [...cart.values()];
+      const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+      const discounted = getDiscountedTotal(subtotal);
+
+      if (!items.length) {
+        cartList.innerHTML = `<div class="cart-row"><strong>尚未加入商品</strong><span class="row-sub">點左側商品大按鈕開始建立訂單。</span></div>`;
+      } else {
+        cartList.innerHTML = items.map(item => `
+          <div class="cart-row">
+            <div class="cart-row-top">
+              <strong>${item.name}</strong>
+              <div class="qty-control">
+                <button class="icon-btn" data-action="dec" data-key="${item.key}">-</button>
+                <strong>${item.qty}</strong>
+                <button class="icon-btn" data-action="inc" data-key="${item.key}">+</button>
+              </div>
+            </div>
+            ${item.components?.length ? `<div class="cart-components">${item.components.join("、")}</div>` : ""}
+            <div class="cart-row-bottom"><span>${item.spec} · ${money(item.price)}</span><strong>${money(item.price * item.qty)}</strong></div>
+          </div>
+        `).join("");
+      }
+
+      document.querySelector("#subtotal").textContent = money(subtotal);
+      document.querySelector("#discounted-total").textContent = money(discounted);
+      document.querySelector("#grand-total").textContent = money(discounted);
+    }
+
+    document.querySelectorAll(".mode-tabs button").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".mode-tabs button").forEach(item => item.classList.remove("active"));
+        document.querySelectorAll(".screen").forEach(item => item.classList.remove("active"));
+        managerEntry.classList.remove("active");
+        button.classList.add("active");
+        document.querySelector(`#screen-${button.dataset.screen}`).classList.add("active");
+      });
+    });
+
+    managerEntry.addEventListener("click", () => {
+      document.querySelectorAll(".mode-tabs button").forEach(item => item.classList.remove("active"));
+      document.querySelectorAll(".screen").forEach(item => item.classList.remove("active"));
+      managerEntry.classList.add("active");
+      document.querySelector("#screen-admin").classList.add("active");
+    });
+
+    document.querySelectorAll(".category-btn").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".category-btn").forEach(item => item.classList.remove("active"));
+        button.classList.add("active");
+        renderProducts(button.dataset.category);
+      });
+    });
+
+    productGrid.addEventListener("click", event => {
+      const button = event.target.closest(".product-btn");
+      if (!button) return;
+      const product = products[button.dataset.category][Number(button.dataset.index)];
+      if (product.gift) openGiftModal(product);
+      else addCartItem(product);
+    });
+
+    cartList.addEventListener("click", event => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      const item = cart.get(button.dataset.key);
+      if (!item) return;
+      if (button.dataset.action === "inc") item.qty += 1;
+      if (button.dataset.action === "dec") item.qty -= 1;
+      if (item.qty <= 0) cart.delete(item.key);
+      renderCart();
+    });
+
+    giftFlavorGrid.addEventListener("click", event => {
+      const button = event.target.closest(".flavor-btn");
+      if (!button || !activeGiftProduct) return;
+      const flavor = button.dataset.flavor;
+      const required = activeGiftProduct.gift.required;
+      if (selectedFlavors.includes(flavor)) {
+        selectedFlavors = selectedFlavors.filter(item => item !== flavor);
+        button.classList.remove("selected");
+      } else if (selectedFlavors.length < required) {
+        selectedFlavors.push(flavor);
+        button.classList.add("selected");
+      }
+      renderGiftSelection();
+    });
+
+    document.querySelector("#gift-modal-close").addEventListener("click", closeGiftModal);
+    giftModal.addEventListener("click", event => {
+      if (event.target === giftModal) closeGiftModal();
+    });
+
+    giftAddCart.addEventListener("click", () => {
+      if (!activeGiftProduct || giftAddCart.disabled) return;
+      const components = activeGiftProduct.gift.mode === "fixed"
+        ? [...activeGiftProduct.gift.fixed]
+        : [...selectedFlavors.map(flavorLabel), ...activeGiftProduct.gift.fixed];
+      addCartItem({
+        name: activeGiftProduct.name,
+        spec: activeGiftProduct.spec,
+        price: activeGiftProduct.price,
+        components
+      });
+      closeGiftModal();
+    });
+
+    document.querySelector("#clear-cart").addEventListener("click", () => {
+      cart.clear();
+      renderCart();
+    });
+
+    document.querySelector("#complete-order").addEventListener("click", () => {
+      alert("Mockup：訂單已完成。正式版會寫入訂單、明細、銷售金額、應收/實收金額、付款與銷售人員紀錄。");
+      cart.clear();
+      renderCart();
+    });
+
+    discountSelect.addEventListener("change", renderCart);
+
+    document.querySelectorAll(".nav-button").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".nav-button").forEach(item => item.classList.remove("active"));
+        document.querySelectorAll(".admin-page").forEach(item => item.classList.remove("active"));
+        button.classList.add("active");
+        document.querySelector(`#admin-${button.dataset.adminPage}`).classList.add("active");
+      });
+    });
+
+    renderProducts("bags");
+    addCartItem({ name: "包種烏龍牛軋糖", spec: "10入/袋", price: 280 });
+    const sampleGift = products.boxes[1];
+    addCartItem({
+      name: sampleGift.name,
+      spec: sampleGift.spec,
+      price: sampleGift.price,
+      components: [
+        "經典原味牛軋糖 6入/袋",
+        "蔓越莓牛軋糖 6入/袋",
+        "草莓牛軋糖 6入/袋",
+        "芒果牛軋糖 6入/袋",
+        "無花果牛軋糖 6入/袋",
+        "紅玉18號紅茶牛軋糖 6入/袋",
+        "抹茶牛軋糖 6入/袋",
+        "包種烏龍牛軋糖 6入/袋",
+        "經典原味蔥軋餅 9入/袋"
+      ]
+    });
+    renderCart();
+  </script>
+</body>
+</html>
