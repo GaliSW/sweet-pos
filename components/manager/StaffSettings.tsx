@@ -125,44 +125,46 @@ export function StaffSettings() {
       <section className="content-grid">
         <article className="panel data-card">
           <h2>員工清單</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>姓名</th>
-                <th>Email</th>
-                <th>角色</th>
-                <th>時薪</th>
-                <th>狀態</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {staff.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.displayName}</td>
-                  <td>{row.email || "—"}</td>
-                  <td>{row.role === "manager" ? "店長" : "員工"}</td>
-                  <td>${row.hourlyWage}</td>
-                  <td>{row.isActive ? "啟用" : "停用"}</td>
-                  <td>
-                    <div className="toolbar">
-                      <button className="secondary-action" onClick={() => editStaff(row)} type="button">
-                        編輯
-                      </button>
-                      <button
-                        className="secondary-action"
-                        disabled={saving}
-                        onClick={() => deleteStaff(row)}
-                        type="button"
-                      >
-                        刪除
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>姓名</th>
+                  <th>Email</th>
+                  <th>角色</th>
+                  <th>時薪</th>
+                  <th>狀態</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {staff.map((row) => (
+                  <tr key={row.id}>
+                    <td>{row.displayName}</td>
+                    <td>{row.email || "—"}</td>
+                    <td>{row.role === "manager" ? "店長" : "員工"}</td>
+                    <td>${row.hourlyWage}</td>
+                    <td>{row.isActive ? "啟用" : "停用"}</td>
+                    <td>
+                      <div className="toolbar">
+                        <button className="secondary-action" onClick={() => editStaff(row)} type="button">
+                          編輯
+                        </button>
+                        <button
+                          className="secondary-action"
+                          disabled={saving}
+                          onClick={() => deleteStaff(row)}
+                          type="button"
+                        >
+                          刪除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <article className="panel data-card form-stack">

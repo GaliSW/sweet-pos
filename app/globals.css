@@ -58,9 +58,16 @@
   color: var(--accent-strong);
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip; /* 防止任何元素把頁面撐出橫向捲動(clip 不會破壞 sticky) */
+}
+
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh; /* 行動瀏覽器工具列收合時的正確視口高度 */
   background:
     radial-gradient(1200px 480px at 85% -10%, rgba(217, 119, 6, 0.07), transparent 60%),
     #f4efe6;
@@ -79,6 +86,13 @@ button {
 
 select {
   cursor: pointer;
+}
+
+button,
+a,
+select {
+  touch-action: manipulation; /* 移除行動裝置點擊的 300ms 延遲 */
+  -webkit-tap-highlight-color: transparent; /* 以自訂 :active 樣式取代系統藍色高亮 */
 }
 
 a {
@@ -114,6 +128,7 @@ select:focus-visible {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-rows: auto 1fr;
 }
@@ -125,7 +140,8 @@ select:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-3) max(var(--space-5), env(safe-area-inset-right)) var(--space-3)
+    max(var(--space-5), env(safe-area-inset-left));
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--line);
@@ -250,6 +266,22 @@ select:focus-visible {
   box-shadow: 0 2px 8px rgba(146, 64, 14, 0.3);
 }
 
+.menu-toggle {
+  display: none; /* 僅手機版顯示(@media 720) */
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  color: var(--ink-soft);
+  flex: 0 0 auto;
+}
+
+.nav-drawer-scrim {
+  display: none; /* 僅手機版顯示(@media 720) */
+}
+
 .manager-entry {
   min-height: 40px;
   color: #faf6ef;
@@ -269,6 +301,8 @@ select:focus-visible {
 
 .workspace {
   padding: var(--space-4);
+  padding-left: max(var(--space-4), env(safe-area-inset-left));
+  padding-right: max(var(--space-4), env(safe-area-inset-right));
   max-width: 1600px;
   margin: 0 auto;
   width: 100%;
@@ -334,8 +368,35 @@ select:focus-visible {
   grid-template-rows: auto 1fr;
 }
 
+/* 訂單面板:深棕標題列+奶油色底,與白色點餐區明確分區 */
 .cart-panel {
   grid-template-rows: auto 1fr auto;
+  position: relative;
+  border-color: var(--line-strong);
+}
+
+.cart-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  z-index: 1;
+  background: linear-gradient(90deg, var(--accent-bright), var(--accent));
+}
+
+.cart-panel > .panel-header {
+  background: linear-gradient(180deg, #46331f, #3a2c1c);
+  border-bottom: 1px solid #2b2016;
+}
+
+.cart-panel > .panel-header h2 {
+  color: #fff;
+}
+
+.cart-panel > .panel-header .pill {
+  background: var(--accent-bright);
+  border-color: transparent;
+  color: #fff;
 }
 
 .panel-header {
@@ -453,7 +514,7 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 9px;
-  background: var(--softer);
+  background: var(--soft);
 }
 
 .cart-row {
@@ -482,6 +543,9 @@ select:focus-visible {
 .icon-btn {
   width: 40px;
   height: 40px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
   border-radius: var(--radius-sm);
   background: var(--soft);
   color: var(--ink);
@@ -532,11 +596,15 @@ select:focus-visible {
 }
 
 .checkout {
-  border-top: 1px solid var(--line);
+  border-top: 1px dashed var(--line-strong); /* 收據感:與訂單清單以虛線分隔 */
   padding: 14px;
   display: grid;
   gap: 10px;
   background: #fff;
+}
+
+.cart-jump {
+  display: none; /* 僅手機版顯示(@media 720) */
 }
 
 /* ---------- forms ---------- */
@@ -599,6 +667,34 @@ select:focus-visible {
   background: var(--soft);
   color: var(--muted);
   cursor: not-allowed;
+}
+
+/* 日期/時間欄位:整個輸入框皆可點開選擇器(非僅右側小圖示),以自訂圖示提示 */
+.field input[type="date"],
+.field input[type="month"],
+.field input[type="time"] {
+  position: relative;
+  padding-right: 38px;
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237d6f5f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='16' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E");
+}
+
+.field input[type="time"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237d6f5f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
+}
+
+/* 把原生選擇器觸發鈕隱形放大到整個輸入框 */
+.field input[type="date"]::-webkit-calendar-picker-indicator,
+.field input[type="month"]::-webkit-calendar-picker-indicator,
+.field input[type="time"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .field.compact {
@@ -681,6 +777,28 @@ select:focus-visible {
   opacity: 0.55;
 }
 
+/* 行動裝置沒有 hover:可點元素提供一致的按壓回饋 */
+.secondary-action:active:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.icon-btn:active,
+.menu-toggle:active,
+.nav-link:active,
+.drawer-link:active,
+.as-link:active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.category-btn:active,
+.flavor-btn:active,
+.shift:active {
+  filter: brightness(0.94);
+}
+
 .as-link {
   display: inline-flex;
   align-items: center;
@@ -713,6 +831,24 @@ select:focus-visible {
   }
 }
 
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 @keyframes modal-in {
   from {
     opacity: 0;
@@ -738,9 +874,11 @@ select:focus-visible {
 
 .modal {
   width: min(620px, 100%);
+  max-height: 90dvh;
   background: #fff;
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   box-shadow: var(--shadow-lg);
   animation: modal-in 170ms ease-out;
 }
@@ -824,6 +962,8 @@ select:focus-visible {
   padding: 14px 16px;
   border-top: 1px solid var(--line);
   background: var(--softer);
+  position: sticky; /* 內容超高捲動時,動作鈕保持可及 */
+  bottom: 0;
 }
 
 .order-modal {
@@ -995,7 +1135,7 @@ select:focus-visible {
   margin: 0 0 var(--space-3);
 }
 
-.data-card table + h2 {
+.data-card :is(table, .table-scroll) + h2 {
   margin-top: var(--space-5);
 }
 
@@ -1081,6 +1221,12 @@ select:focus-visible {
 }
 
 /* ---------- tables ---------- */
+
+/* 表格一律包在捲動容器內:窄螢幕超寬時於容器內橫向捲動,表格本身維持 full-width */
+.table-scroll {
+  overflow-x: auto;
+  min-width: 0;
+}
 
 table {
   width: 100%;
@@ -1174,8 +1320,14 @@ tbody tr:last-child td {
 .toolbar {
   display: flex;
   gap: 8px;
-  align-items: center;
+  /* 貼齊輸入框底緣:欄位含上方標籤較高,置中會讓等高按鈕浮起而不對齊 */
+  align-items: flex-end;
   flex-wrap: wrap;
+}
+
+/* 狀態膠囊(28px)相對 42px 輸入列做光學置中 */
+.section-title .toolbar .pill {
+  margin-bottom: 7px;
 }
 
 /* ---------- schedule ---------- */
@@ -1204,7 +1356,9 @@ tbody tr:last-child td {
   grid-template-columns: repeat(7, minmax(120px, 1fr));
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  overflow: hidden;
+  /* 月曆最小寬 840px:視窗較窄時在月曆內部橫向捲動,不撐破頁面 */
+  overflow-x: auto;
+  overflow-y: hidden;
   background: #fff;
   box-shadow: var(--shadow-sm);
 }
@@ -1279,6 +1433,18 @@ tbody tr:last-child td {
   gap: 14px;
 }
 
+.schedule-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.schedule-editor-scrim,
+.sheet-close {
+  display: none; /* 僅手機版顯示(@media 720) */
+}
+
 .schedule-editor p {
   margin: 6px 0 0;
   color: var(--muted);
@@ -1316,6 +1482,7 @@ tbody tr:last-child td {
 
 .login-page {
   min-height: calc(100vh - 120px);
+  min-height: calc(100dvh - 120px);
   display: grid;
   place-items: center;
 }
@@ -1431,7 +1598,6 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 720px) {
-  .topbar,
   .section-title,
   .field-row {
     align-items: stretch;
@@ -1439,43 +1605,342 @@ tbody tr:last-child td {
     grid-template-columns: 1fr;
   }
 
-  .topbar {
-    position: static;
+  /* 頂欄維持單列吸頂:導覽連結全部收進漢堡選單 */
+  .top-actions {
+    flex: 0 0 auto;
+    overflow-x: visible;
   }
 
-  .top-actions {
-    width: 100%;
+  .top-actions .user-chip,
+  .top-actions .nav-link,
+  .top-actions .manager-entry {
+    display: none;
+  }
+
+  .menu-toggle {
+    display: inline-grid;
   }
 
   .counter-switcher {
-    margin-left: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* 小螢幕省空間:隱藏「目前櫃位」字樣,保留櫃位名稱 */
+  .counter-switcher > span:first-child {
+    display: none;
+  }
+
+  .counter-switcher select {
+    min-width: 0;
+  }
+
+  /* ---------- 行動導覽抽屜 ---------- */
+
+  .nav-drawer-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(9, 18, 28, 0.5);
+    backdrop-filter: blur(3px);
+    animation: backdrop-in 140ms ease-out;
+  }
+
+  .nav-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(300px, 84vw);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    overflow-y: auto;
+    animation: drawer-in 200ms ease-out;
+  }
+
+  .nav-drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .nav-drawer-body {
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    display: grid;
+    gap: 4px;
+    align-content: start;
+  }
+
+  .nav-drawer-label {
+    margin: 12px 4px 4px;
+    color: var(--faint);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+  }
+
+  .nav-drawer-label:first-child {
+    margin-top: 0;
+  }
+
+  .drawer-link {
+    min-height: 46px; /* 觸控目標 ≥44px */
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--ink-soft);
+    font-weight: 800;
+    text-align: left;
+    transition: background 140ms ease, color 140ms ease;
+  }
+
+  .drawer-link:hover {
+    background: var(--soft);
+    color: var(--ink);
+  }
+
+  .drawer-link.active {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  .drawer-link.logout {
+    margin-top: 12px;
+    color: var(--danger);
   }
 
   .workspace {
-    padding: 10px;
+    padding: var(--space-3);
+    padding-left: max(var(--space-3), env(safe-area-inset-left));
+    padding-right: max(var(--space-3), env(safe-area-inset-right));
   }
 
-  .product-grid,
-  .kpi-grid,
-  .admin-nav {
-    grid-template-columns: 1fr;
+  .pos-layout {
+    min-height: auto;
+    /* 底部迷你訂單列為 fixed,預留空間避免蓋住結帳鈕 */
+    padding-bottom: 76px;
   }
+
+  /* ---------- 觸控目標 ≥44px ---------- */
+
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .secondary-action,
+  .nav-link {
+    min-height: 44px;
+  }
+
+  .field input,
+  .field select,
+  .qty-input {
+    min-height: 44px;
+  }
+
+  /* 主工具列動作鈕與欄位同寬排版,不再縮在角落 */
+  .section-title .toolbar .secondary-action,
+  .section-title .toolbar .primary-action {
+    flex: 1 1 140px;
+  }
+
+  .section-title .toolbar .pill {
+    margin-bottom: 8px;
+  }
+
+  /* 工具列與膠囊:允許換行、欄位彈性縮放,避免撐寬頁面 */
+  .panel-header,
+  .schedule-summary {
+    flex-wrap: wrap;
+  }
+
+  .section-title .toolbar,
+  .toolbar {
+    width: 100%;
+  }
+
+  .toolbar .field.compact {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+
+  .pill,
+  .status {
+    white-space: normal;
+  }
+
+  .schedule-controls .field {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .form-actions .primary-action,
+  .form-actions .secondary-action {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* 手機:商品與 KPI 維持雙欄減少捲動;後台側欄由漢堡選單取代 */
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-nav {
+    display: none;
+  }
+
+  .kpi strong {
+    font-size: 22px;
+  }
+
+  /* ---------- 排班:月曆壓縮成日列表,編輯區改底部面板 ---------- */
 
   .calendar {
     grid-template-columns: 1fr;
   }
 
-  .schedule-actions {
-    grid-template-columns: 1fr;
+  /* 每天一列:日期(含星期) | 早班 | 晚班 */
+  .day {
+    min-height: 0;
+    grid-template-columns: 58px 1fr 1fr;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-right: 0;
   }
 
-  .day:nth-child(7n) {
-    border-right: 1px solid var(--line);
+  .shift {
+    min-height: 44px;
+    padding: 6px 8px;
+    align-content: center;
   }
+
+  .shift small {
+    display: none; /* 時間細節於編輯面板檢視 */
+  }
+
+  .schedule-editor {
+    display: none;
+  }
+
+  .schedule-editor.open {
+    display: grid;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    max-height: 88dvh;
+    overflow-y: auto;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-bottom: 0;
+    box-shadow: var(--shadow-lg);
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+    animation: sheet-in 240ms ease-out;
+  }
+
+  .schedule-editor-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(9, 18, 28, 0.5);
+    backdrop-filter: blur(3px);
+    animation: backdrop-in 140ms ease-out;
+  }
+
+  .sheet-close {
+    display: inline-grid;
+    flex: 0 0 auto;
+  }
+
+  .schedule-controls .secondary-action,
+  .schedule-controls .primary-action {
+    flex: 1 1 40%;
+  }
+
+  .schedule-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .schedule-actions .primary-action {
+    grid-column: 1 / -1;
+  }
+
+  /* ---------- 彈窗改 bottom sheet ---------- */
+
+  .modal-backdrop {
+    place-items: end center;
+    padding: 0;
+  }
+
+  .modal {
+    max-height: 92dvh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: sheet-in 240ms ease-out;
+  }
+
+  .modal-actions button {
+    flex: 1;
+    min-height: 48px;
+  }
+
+  /* ---------- POS 底部迷你訂單列 ---------- */
+
+  .cart-jump {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 30;
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 18px;
+    border-radius: 999px;
+    background: #3a2c1c;
+    color: #fff;
+    font-weight: 900;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .cart-jump strong {
+    color: var(--amber);
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- 表格 full-width + 容器內橫向捲動 ---------- */
 
   table {
-    display: block;
-    overflow-x: auto;
     white-space: nowrap;
+  }
+
+  .table-scroll {
+    position: relative;
+  }
+
+  /* 右緣漸層提示可左滑 */
+  .table-scroll::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 14px;
+    pointer-events: none;
+    background: linear-gradient(270deg, rgba(63, 45, 26, 0.08), transparent);
   }
 }

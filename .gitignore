@@ -9,3 +9,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# supabase CLI 本機暫存
+supabase/.temp/
+supabase/.branches/
+.DS_Store
+
+# 專案以 npm(package-lock.json)為準,避免 Vercel 誤用 pnpm
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+# TypeScript 建置快取
+tsconfig.tsbuildinfo

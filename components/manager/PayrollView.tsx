@@ -111,37 +111,39 @@ export function PayrollView() {
 
       <section className="panel data-card">
         <h2>{month} 薪資試算（合計 {formatCurrency(totalPay)}）</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>員工</th>
-              <th>班數</th>
-              <th>時數</th>
-              <th>時薪</th>
-              <th>底薪</th>
-              <th>抽成</th>
-              <th>預估合計</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payroll.map((row) => (
-              <tr key={row.staffId}>
-                <td>{row.staffName}</td>
-                <td>{row.shiftCount}</td>
-                <td>{row.scheduledHours}h</td>
-                <td>${row.hourlyWage}</td>
-                <td>{formatCurrency(row.basePay)}</td>
-                <td>{formatCurrency(row.commission)}</td>
-                <td>{formatCurrency(row.estimatedTotal)}</td>
-              </tr>
-            ))}
-            {payroll.length === 0 ? (
+        <div className="table-scroll">
+          <table>
+            <thead>
               <tr>
-                <td colSpan={7}>本月沒有排班或業績資料</td>
+                <th>員工</th>
+                <th>班數</th>
+                <th>時數</th>
+                <th>時薪</th>
+                <th>底薪</th>
+                <th>抽成</th>
+                <th>預估合計</th>
               </tr>
-            ) : null}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {payroll.map((row) => (
+                <tr key={row.staffId}>
+                  <td>{row.staffName}</td>
+                  <td>{row.shiftCount}</td>
+                  <td>{row.scheduledHours}h</td>
+                  <td>${row.hourlyWage}</td>
+                  <td>{formatCurrency(row.basePay)}</td>
+                  <td>{formatCurrency(row.commission)}</td>
+                  <td>{formatCurrency(row.estimatedTotal)}</td>
+                </tr>
+              ))}
+              {payroll.length === 0 ? (
+                <tr>
+                  <td colSpan={7}>本月沒有排班或業績資料</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="panel data-card form-stack">
@@ -211,70 +213,74 @@ export function PayrollView() {
       <section className="content-grid">
         <article className="panel data-card">
           <h2>業績紀錄（{month}）</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>員工</th>
-                <th>訂單數</th>
-                <th>實收</th>
-                <th>抽成</th>
-              </tr>
-            </thead>
-            <tbody>
-              {monthly.map((row) => (
-                <tr key={`${row.month}-${row.sellerId}`}>
-                  <td>{row.sellerName}</td>
-                  <td>{row.orderCount}</td>
-                  <td>{formatCurrency(row.receivedAmount)}</td>
-                  <td>{formatCurrency(row.commission)}</td>
-                </tr>
-              ))}
-              {monthly.length === 0 ? (
+          <div className="table-scroll">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={4}>本月沒有訂單</td>
+                  <th>員工</th>
+                  <th>訂單數</th>
+                  <th>實收</th>
+                  <th>抽成</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {monthly.map((row) => (
+                  <tr key={`${row.month}-${row.sellerId}`}>
+                    <td>{row.sellerName}</td>
+                    <td>{row.orderCount}</td>
+                    <td>{formatCurrency(row.receivedAmount)}</td>
+                    <td>{formatCurrency(row.commission)}</td>
+                  </tr>
+                ))}
+                {monthly.length === 0 ? (
+                  <tr>
+                    <td colSpan={4}>本月沒有訂單</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <article className="panel data-card">
           <h2>上班紀錄（{month}）</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>員工</th>
-                <th>櫃位</th>
-                <th>班別</th>
-                <th>時段</th>
-                <th>狀態</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shifts.map((shift) => (
-                <tr key={shift.id}>
-                  <td>{shift.shiftDate}</td>
-                  <td>{shift.staffName}</td>
-                  <td>{shift.counterName}</td>
-                  <td>{shift.shiftLabel}</td>
-                  <td>
-                    {shift.startsAt}-{shift.endsAt}
-                  </td>
-                  <td>
-                    <span className={shift.published ? "status" : "status warn"}>
-                      {shift.published ? "已發布" : "草稿"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {shifts.length === 0 ? (
+          <div className="table-scroll">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={6}>本月沒有排班</td>
+                  <th>日期</th>
+                  <th>員工</th>
+                  <th>櫃位</th>
+                  <th>班別</th>
+                  <th>時段</th>
+                  <th>狀態</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {shifts.map((shift) => (
+                  <tr key={shift.id}>
+                    <td>{shift.shiftDate}</td>
+                    <td>{shift.staffName}</td>
+                    <td>{shift.counterName}</td>
+                    <td>{shift.shiftLabel}</td>
+                    <td>
+                      {shift.startsAt}-{shift.endsAt}
+                    </td>
+                    <td>
+                      <span className={shift.published ? "status" : "status warn"}>
+                        {shift.published ? "已發布" : "草稿"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {shifts.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>本月沒有排班</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </article>
       </section>
     </>

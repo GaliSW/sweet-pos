@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { CounterSwitcher } from "@/components/shared/CounterSwitcher";
 import { MainNavigation } from "@/components/shared/MainNavigation";
@@ -7,6 +7,12 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "POS Cloud",
   description: "Cloud POS and operations console for counter teams"
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" // 內容延伸至瀏海/手勢區,由 CSS safe-area inset 留白
 };
 
 export default function RootLayout({

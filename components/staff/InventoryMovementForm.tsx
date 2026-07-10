@@ -344,81 +344,85 @@ export function InventoryMovementForm() {
 
       <section className="panel data-card">
         <h2>{currentCounterName} 最近紀錄</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>時間</th>
-              <th>類型</th>
-              <th>品項</th>
-              <th>數量</th>
-              <th>備註</th>
-              <th>建立 / 更新</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {latestMovements.map((movement) => (
-              <tr key={movement.id}>
-                <td>{formatTime(movement.createdAt)}</td>
-                <td>{movement.movementLabel}</td>
-                <td>{movement.itemName}</td>
-                <td>{movement.countedQuantity ?? movement.quantity}</td>
-                <td>{movement.note ?? "-"}</td>
-                <td>
-                  {movement.createdByName}
-                  {movement.updatedByName ? `（${movement.updatedByName} 更新）` : ""}
-                </td>
-                <td>
-                  {canEdit(movement) ? (
-                    <div className="toolbar">
-                      <button
-                        className="secondary-action"
-                        onClick={() => startEdit(movement)}
-                        type="button"
-                      >
-                        編輯
-                      </button>
-                      <button
-                        className="secondary-action"
-                        disabled={submitting}
-                        onClick={() => deleteMovement(movement)}
-                        type="button"
-                      >
-                        刪除
-                      </button>
-                    </div>
-                  ) : null}
-                </td>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>時間</th>
+                <th>類型</th>
+                <th>品項</th>
+                <th>數量</th>
+                <th>備註</th>
+                <th>建立 / 更新</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {latestMovements.map((movement) => (
+                <tr key={movement.id}>
+                  <td>{formatTime(movement.createdAt)}</td>
+                  <td>{movement.movementLabel}</td>
+                  <td>{movement.itemName}</td>
+                  <td>{movement.countedQuantity ?? movement.quantity}</td>
+                  <td>{movement.note ?? "-"}</td>
+                  <td>
+                    {movement.createdByName}
+                    {movement.updatedByName ? `（${movement.updatedByName} 更新）` : ""}
+                  </td>
+                  <td>
+                    {canEdit(movement) ? (
+                      <div className="toolbar">
+                        <button
+                          className="secondary-action"
+                          onClick={() => startEdit(movement)}
+                          type="button"
+                        >
+                          編輯
+                        </button>
+                        <button
+                          className="secondary-action"
+                          disabled={submitting}
+                          onClick={() => deleteMovement(movement)}
+                          type="button"
+                        >
+                          刪除
+                        </button>
+                      </div>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="panel data-card inventory-summary-panel">
         <h2>庫存摘要</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>櫃位</th>
-              <th>品項</th>
-              <th>推估庫存</th>
-            </tr>
-          </thead>
-          <tbody>
-            {summary.map((row) => (
-              <tr key={`${row.counterName}-${row.itemName}-${row.itemSpec}`}>
-                <td>{row.counterName}</td>
-                <td>
-                  {row.itemName}（{row.itemSpec}）
-                </td>
-                <td>
-                  <span className={row.stock <= 10 ? "status warn" : "status"}>{row.stock}</span>
-                </td>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>櫃位</th>
+                <th>品項</th>
+                <th>推估庫存</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {summary.map((row) => (
+                <tr key={`${row.counterName}-${row.itemName}-${row.itemSpec}`}>
+                  <td>{row.counterName}</td>
+                  <td>
+                    {row.itemName}（{row.itemSpec}）
+                  </td>
+                  <td>
+                    <span className={row.stock <= 10 ? "status warn" : "status"}>{row.stock}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   );

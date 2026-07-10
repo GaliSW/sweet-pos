@@ -91,35 +91,37 @@ export function ManagerDashboard() {
       <section className="content-grid">
         <article className="panel data-card">
           <h2>每日員工業績</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>人員</th>
-                <th>櫃位</th>
-                <th>訂單</th>
-                <th>實收</th>
-                <th>抽成</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(report?.daily ?? []).slice(0, 12).map((row) => (
-                <tr key={`${row.date}-${row.sellerId}-${row.counterId}`}>
-                  <td>{row.date}</td>
-                  <td>{row.sellerName}</td>
-                  <td>{row.counterName}</td>
-                  <td>{row.orderCount}</td>
-                  <td>{formatCurrency(row.receivedAmount)}</td>
-                  <td>{formatCurrency(row.commission)}</td>
-                </tr>
-              ))}
-              {report && report.daily.length === 0 ? (
+          <div className="table-scroll">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={6}>本月尚無訂單</td>
+                  <th>日期</th>
+                  <th>人員</th>
+                  <th>櫃位</th>
+                  <th>訂單</th>
+                  <th>實收</th>
+                  <th>抽成</th>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(report?.daily ?? []).slice(0, 12).map((row) => (
+                  <tr key={`${row.date}-${row.sellerId}-${row.counterId}`}>
+                    <td>{row.date}</td>
+                    <td>{row.sellerName}</td>
+                    <td>{row.counterName}</td>
+                    <td>{row.orderCount}</td>
+                    <td>{formatCurrency(row.receivedAmount)}</td>
+                    <td>{formatCurrency(row.commission)}</td>
+                  </tr>
+                ))}
+                {report && report.daily.length === 0 ? (
+                  <tr>
+                    <td colSpan={6}>本月尚無訂單</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </article>
         <article className="panel data-card">
           <h2>櫃位目標</h2>

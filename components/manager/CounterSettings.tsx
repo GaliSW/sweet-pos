@@ -141,50 +141,52 @@ export function CounterSettings() {
 
       <section className="content-grid">
         <article className="panel data-card">
-          <table>
-            <thead>
-              <tr>
-                <th>櫃位</th>
-                <th>位置</th>
-                <th>月目標</th>
-                <th>實收</th>
-                <th>達成率</th>
-                <th>狀態</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {counters.map((counter) => (
-                <tr key={counter.id}>
-                  <td>{counter.name}</td>
-                  <td>{counter.location ?? "—"}</td>
-                  <td>{counter.targetAmount > 0 ? formatCurrency(counter.targetAmount) : "未設定"}</td>
-                  <td>{formatCurrency(counter.achievedAmount)}</td>
-                  <td>{Math.round(counter.achievementRate * 100)}%</td>
-                  <td>{counter.isActive ? "啟用" : "停用"}</td>
-                  <td>
-                    <div className="toolbar">
-                      <button
-                        className="secondary-action"
-                        onClick={() => editCounter(counter)}
-                        type="button"
-                      >
-                        編輯
-                      </button>
-                      <button
-                        className="secondary-action"
-                        disabled={saving}
-                        onClick={() => deleteCounter(counter)}
-                        type="button"
-                      >
-                        刪除
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>櫃位</th>
+                  <th>位置</th>
+                  <th>月目標</th>
+                  <th>實收</th>
+                  <th>達成率</th>
+                  <th>狀態</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {counters.map((counter) => (
+                  <tr key={counter.id}>
+                    <td>{counter.name}</td>
+                    <td>{counter.location ?? "—"}</td>
+                    <td>{counter.targetAmount > 0 ? formatCurrency(counter.targetAmount) : "未設定"}</td>
+                    <td>{formatCurrency(counter.achievedAmount)}</td>
+                    <td>{Math.round(counter.achievementRate * 100)}%</td>
+                    <td>{counter.isActive ? "啟用" : "停用"}</td>
+                    <td>
+                      <div className="toolbar">
+                        <button
+                          className="secondary-action"
+                          onClick={() => editCounter(counter)}
+                          type="button"
+                        >
+                          編輯
+                        </button>
+                        <button
+                          className="secondary-action"
+                          disabled={saving}
+                          onClick={() => deleteCounter(counter)}
+                          type="button"
+                        >
+                          刪除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <article className="panel data-card form-stack">

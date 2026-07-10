@@ -120,33 +120,35 @@ export function StaffScheduleTable() {
         <h2>本月班表</h2>
         <span className="pill">{status}</span>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>日期</th>
-            <th>班別</th>
-            <th>時段</th>
-            <th>櫃位</th>
-            <th>提醒</th>
-          </tr>
-        </thead>
-        <tbody>
-          {shifts.map((shift) => (
-            <tr key={shift.id}>
-              <td>{shift.shiftDate}</td>
-              <td>{shift.shiftLabel}</td>
-              <td>
-                {shift.startsAt}-{shift.endsAt}
-              </td>
-              <td>{shift.counterName}</td>
-              <td>
-                <span className="status">開班盤點</span>{" "}
-                <span className="status warn">下班盤點</span>
-              </td>
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>班別</th>
+              <th>時段</th>
+              <th>櫃位</th>
+              <th>提醒</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {shifts.map((shift) => (
+              <tr key={shift.id}>
+                <td>{shift.shiftDate}</td>
+                <td>{shift.shiftLabel}</td>
+                <td>
+                  {shift.startsAt}-{shift.endsAt}
+                </td>
+                <td>{shift.counterName}</td>
+                <td>
+                  <span className="status">開班盤點</span>{" "}
+                  <span className="status warn">下班盤點</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       </section>
     </>
   );

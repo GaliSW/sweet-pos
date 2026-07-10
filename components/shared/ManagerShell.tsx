@@ -2,18 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const links = [
-  { href: "/manager", label: "總覽" },
-  { href: "/manager/reports", label: "報表" },
-  { href: "/manager/orders", label: "訂單" },
-  { href: "/manager/schedule", label: "排班" },
-  { href: "/manager/payroll", label: "薪資" },
-  { href: "/manager/inventory", label: "庫存" },
-  { href: "/manager/products", label: "商品" },
-  { href: "/manager/counters", label: "櫃位" },
-  { href: "/manager/staff", label: "員工" }
-] as const;
+import { managerNavLinks as links } from "./nav-links";
 
 export function ManagerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

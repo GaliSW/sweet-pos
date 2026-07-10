@@ -364,84 +364,86 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
       </section>
 
       <section className="panel data-card">
-        <table>
-          <thead>
-            <tr>
-              <th>時間</th>
-              <th>單號</th>
-              <th>櫃位</th>
-              <th>明細</th>
-              <th>銷售 / 收銀</th>
-              <th>付款</th>
-              <th>實收</th>
-              <th>狀態</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {visibleOrders.map((order) => (
-              <tr key={order.id}>
-                <td>{formatTime(order.createdAt)}</td>
-                <td>{order.orderNo}</td>
-                <td>{order.counterName}</td>
-                <td>
-                  <button
-                    className="as-link"
-                    onClick={() => setDetailOrder(order)}
-                    type="button"
-                  >
-                    {order.items.reduce((total, item) => total + item.quantity, 0)} 件（
-                    {order.items.length} 項）
-                  </button>
-                </td>
-                <td>
-                  {order.sellerName}
-                  {order.cashierName !== order.sellerName ? ` / ${order.cashierName}` : ""}
-                </td>
-                <td>{order.paymentLabel}</td>
-                <td>{formatCurrency(order.receivedAmount)}</td>
-                <td>
-                  <span className={order.status === "voided" ? "status warn" : "status"}>
-                    {order.status === "voided" ? "已作廢" : "完成"}
-                  </span>{" "}
-                  {order.hasPreorder ? <span className="status warn">含預購</span> : null}
-                  {order.editedByName ? (
-                    <span className="status">{order.editedByName} 改單</span>
-                  ) : null}
-                </td>
-                <td>
-                  <div className="toolbar">
-                    {variant === "manager" && order.canEdit ? (
-                      <button
-                        className="secondary-action"
-                        disabled={working}
-                        onClick={() => startEdit(order)}
-                        type="button"
-                      >
-                        編輯
-                      </button>
-                    ) : null}
-                    {order.canVoid ? (
-                      <button
-                        className="secondary-action"
-                        disabled={working}
-                        onClick={() => voidOrder(order)}
-                        type="button"
-                      >
-                        作廢
-                      </button>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {visibleOrders.length === 0 ? (
+        <div className="table-scroll">
+          <table>
+            <thead>
               <tr>
-                <td colSpan={9}>沒有符合條件的訂單</td>
+                <th>時間</th>
+                <th>單號</th>
+                <th>櫃位</th>
+                <th>明細</th>
+                <th>銷售 / 收銀</th>
+                <th>付款</th>
+                <th>實收</th>
+                <th>狀態</th>
+                <th />
               </tr>
-            ) : null}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {visibleOrders.map((order) => (
+                <tr key={order.id}>
+                  <td>{formatTime(order.createdAt)}</td>
+                  <td>{order.orderNo}</td>
+                  <td>{order.counterName}</td>
+                  <td>
+                    <button
+                      className="as-link"
+                      onClick={() => setDetailOrder(order)}
+                      type="button"
+                    >
+                      {order.items.reduce((total, item) => total + item.quantity, 0)} 件（
+                      {order.items.length} 項）
+                    </button>
+                  </td>
+                  <td>
+                    {order.sellerName}
+                    {order.cashierName !== order.sellerName ? ` / ${order.cashierName}` : ""}
+                  </td>
+                  <td>{order.paymentLabel}</td>
+                  <td>{formatCurrency(order.receivedAmount)}</td>
+                  <td>
+                    <span className={order.status === "voided" ? "status warn" : "status"}>
+                      {order.status === "voided" ? "已作廢" : "完成"}
+                    </span>{" "}
+                    {order.hasPreorder ? <span className="status warn">含預購</span> : null}
+                    {order.editedByName ? (
+                      <span className="status">{order.editedByName} 改單</span>
+                    ) : null}
+                  </td>
+                  <td>
+                    <div className="toolbar">
+                      {variant === "manager" && order.canEdit ? (
+                        <button
+                          className="secondary-action"
+                          disabled={working}
+                          onClick={() => startEdit(order)}
+                          type="button"
+                        >
+                          編輯
+                        </button>
+                      ) : null}
+                      {order.canVoid ? (
+                        <button
+                          className="secondary-action"
+                          disabled={working}
+                          onClick={() => voidOrder(order)}
+                          type="button"
+                        >
+                          作廢
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {visibleOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={9}>沒有符合條件的訂單</td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {detailOrder ? (
@@ -469,35 +471,37 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
             </div>
 
             <div className="order-modal-body">
-            <table>
-              <thead>
-                <tr>
-                  <th>品項</th>
-                  <th>單價</th>
-                  <th>數量</th>
-                  <th>小計</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detailOrder.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      {item.productName}（{item.spec}）
-                      {item.giftFlavors.length > 0 ? (
-                        <p className="cart-components">
-                          {item.giftFlavors
-                            .map((flavor) => `${flavor.flavorName} x${flavor.quantity}`)
-                            .join("、")}
-                        </p>
-                      ) : null}
-                    </td>
-                    <td>${item.unitPrice}</td>
-                    <td>{item.quantity}</td>
-                    <td>{formatCurrency(item.lineTotal)}</td>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>品項</th>
+                    <th>單價</th>
+                    <th>數量</th>
+                    <th>小計</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {detailOrder.items.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        {item.productName}（{item.spec}）
+                        {item.giftFlavors.length > 0 ? (
+                          <p className="cart-components">
+                            {item.giftFlavors
+                              .map((flavor) => `${flavor.flavorName} x${flavor.quantity}`)
+                              .join("、")}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td>${item.unitPrice}</td>
+                      <td>{item.quantity}</td>
+                      <td>{formatCurrency(item.lineTotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {detailOrder.preorderItems.length > 0 ? (
               <div className="split-example">
@@ -611,66 +615,68 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
               </label>
             </div>
 
-            <table>
-              <thead>
-                <tr>
-                  <th>品項</th>
-                  <th>數量</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {editDraft.items.map((item, index) => (
-                  <tr key={`${item.productId}-${index}`}>
-                    <td>
-                      {item.productName}
-                      {item.giftFlavors.length > 0 ? (
-                        <p className="cart-components">
-                          {item.giftFlavors
-                            .map((flavor) => `${flavor.flavorName} x${flavor.quantity}`)
-                            .join("、")}
-                        </p>
-                      ) : null}
-                    </td>
-                    <td>
-                      <div className="qty-control">
-                        <button
-                          className="icon-btn"
-                          onClick={() => updateDraftQuantity(index, item.quantity - 1)}
-                          type="button"
-                        >
-                          -
-                        </button>
-                        <input
-                          className="qty-input"
-                          inputMode="numeric"
-                          value={item.quantity}
-                          onChange={(event) =>
-                            updateDraftQuantity(index, Number(event.target.value))
-                          }
-                        />
-                        <button
-                          className="icon-btn"
-                          onClick={() => updateDraftQuantity(index, item.quantity + 1)}
-                          type="button"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </td>
-                    <td>
-                      <button
-                        className="secondary-action"
-                        onClick={() => updateDraftQuantity(index, 0)}
-                        type="button"
-                      >
-                        移除
-                      </button>
-                    </td>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>品項</th>
+                    <th>數量</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {editDraft.items.map((item, index) => (
+                    <tr key={`${item.productId}-${index}`}>
+                      <td>
+                        {item.productName}
+                        {item.giftFlavors.length > 0 ? (
+                          <p className="cart-components">
+                            {item.giftFlavors
+                              .map((flavor) => `${flavor.flavorName} x${flavor.quantity}`)
+                              .join("、")}
+                          </p>
+                        ) : null}
+                      </td>
+                      <td>
+                        <div className="qty-control">
+                          <button
+                            className="icon-btn"
+                            onClick={() => updateDraftQuantity(index, item.quantity - 1)}
+                            type="button"
+                          >
+                            -
+                          </button>
+                          <input
+                            className="qty-input"
+                            inputMode="numeric"
+                            value={item.quantity}
+                            onChange={(event) =>
+                              updateDraftQuantity(index, Number(event.target.value))
+                            }
+                          />
+                          <button
+                            className="icon-btn"
+                            onClick={() => updateDraftQuantity(index, item.quantity + 1)}
+                            type="button"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </td>
+                      <td>
+                        <button
+                          className="secondary-action"
+                          onClick={() => updateDraftQuantity(index, 0)}
+                          type="button"
+                        >
+                          移除
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             <label className="field">
               <span>新增袋裝商品</span>

@@ -54,6 +54,7 @@ export function SchedulePlanner() {
   const [assignments, setAssignments] = useState<Record<string, ShiftAssignment>>({});
   const [status, setStatus] = useState("讀取班表中...");
   const [saving, setSaving] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const days = useMemo(() => daysInMonth(month), [month]);
   const selectedAssignment =
@@ -80,6 +81,31 @@ export function SchedulePlanner() {
   useEffect(() => {
     if (counterId) void loadShifts();
   }, [counterId, month]);
+
+  // 手機版編輯面板為底部彈出:鎖定背景捲動並支援 Escape 關閉;桌面版編輯欄常駐不受影響
+  useEffect(() => {
+    if (!editorOpen) return;
+
+    const mobile = window.matchMedia("(max-width: 720px)");
+
+    function syncScrollLock() {
+      document.body.style.overflow = mobile.matches ? "hidden" : "";
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setEditorOpen(false);
+    }
+
+    syncScrollLock();
+    document.addEventListener("keydown", onKeyDown);
+    mobile.addEventListener("change", syncScrollLock);
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      mobile.removeEventListener("change", syncScrollLock);
+      document.body.style.overflow = "";
+    };
+  }, [editorOpen]);
 
   async function loadCatalog() {
     const response = await fetch("/api/catalog");
@@ -143,6 +169,7 @@ export function SchedulePlanner() {
 
   function selectSlot(date: string, shiftCode: ShiftCode) {
     setSelectedSlot({ date, shiftCode });
+    setEditorOpen(true);
   }
 
   function updateSelectedAssignment(partial: Partial<ShiftAssignment>) {
@@ -189,6 +216,7 @@ export function SchedulePlanner() {
     }
 
     setStatus(published ? "班次已儲存並發布" : "班次草稿已儲存");
+    setEditorOpen(false);
     await loadShifts();
   }
 
@@ -280,7 +308,7 @@ export function SchedulePlanner() {
           return (
             <article className="day" key={date}>
               <span className="day-number">
-                {Number(month.slice(5, 7))}/{displayDay}
+                {Number(month.slice(5, 7))}/{displayDay} 週{weekdayOf(date)}
               </span>
               {(["morning", "evening"] as ShiftCode[]).map((shiftCode) => {
                 const active = selectedSlot.date === date && selectedSlot.shiftCode === shiftCode;
@@ -310,16 +338,45 @@ export function SchedulePlanner() {
         })}
       </div>
 
-      <aside className="panel data-card schedule-editor">
-        <div>
-          <h2>編輯班次</h2>
-          <p>
-            {selectedSlot.date} {shiftLabels[selectedSlot.shiftCode]} /{" "}
-            {calculateHours(selectedAssignment)} 小時
-          </p>
-          <span className={selectedAssignment.published ? "status" : "status warn"}>
-            {selectedAssignment.published ? "已發布" : "未發布"}
-          </span>
+      {editorOpen ? (
+        <div
+          className="schedule-editor-scrim"
+          onClick={() => setEditorOpen(false)}
+          role="presentation"
+        />
+      ) : null}
+
+      <aside className={`panel data-card schedule-editor ${editorOpen ? "open" : ""}`}>
+        <div className="schedule-editor-head">
+          <div>
+            <h2>編輯班次</h2>
+            <p>
+              {selectedSlot.date} 週{weekdayOf(selectedSlot.date)}{" "}
+              {shiftLabels[selectedSlot.shiftCode]} / {calculateHours(selectedAssignment)} 小時
+            </p>
+            <span className={selectedAssignment.published ? "status" : "status warn"}>
+              {selectedAssignment.published ? "已發布" : "未發布"}
+            </span>
+          </div>
+          <button
+            aria-label="關閉編輯面板"
+            className="icon-btn sheet-close"
+            onClick={() => setEditorOpen(false)}
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="18"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="2.2"
+              viewBox="0 0 24 24"
+              width="18"
+            >
+              <path d="M5 5l14 14M19 5L5 19" />
+            </svg>
+          </button>
         </div>
 
         <label className="field">
@@ -355,12 +412,6 @@ export function SchedulePlanner() {
             />
           </label>
         </div>
-        <div className="split-example">
-          <strong>範例</strong>
-          <span>10:30-14:30 排 A 4 小時，14:30-22:30 排 B 8 小時。</span>
-          <span>發布後仍可修改：儲存草稿會把該班轉回未發布，需再次發布員工才看得到。</span>
-        </div>
-
         <div className="schedule-actions">
           <button className="secondary-action" onClick={() => assignStaff("")} type="button">
             清空此班
@@ -383,6 +434,12 @@ export function SchedulePlanner() {
           </button>
         </div>
 
+        <div className="split-example">
+          <strong>範例</strong>
+          <span>10:30-14:30 排 A 4 小時，14:30-22:30 排 B 8 小時。</span>
+          <span>發布後仍可修改：儲存草稿會把該班轉回未發布，需再次發布員工才看得到。</span>
+        </div>
+
         <div className="schedule-summary">
           <span className={missingCount > 0 ? "status warn" : "status"}>
             {missingCount > 0 ? `${missingCount} 個班次未排` : "班表已排滿"}
@@ -396,6 +453,11 @@ export function SchedulePlanner() {
 
 function slotKey(date: string, shiftCode: ShiftCode) {
   return `${date}-${shiftCode}`;
+}
+
+function weekdayOf(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return "日一二三四五六"[new Date(year, month - 1, day).getDay()];
 }
 
 function createDefaultAssignment(shiftCode: ShiftCode): ShiftAssignment {

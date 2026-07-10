@@ -169,100 +169,104 @@ export function InventoryDashboard() {
 
       <section className="panel data-card">
         <h2>庫存摘要</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>櫃位</th>
-              <th>品項</th>
-              <th>推估庫存</th>
-              <th>狀態</th>
-            </tr>
-          </thead>
-          <tbody>
-            {summary.map((row) => {
-              const label = row.stock <= 0 ? "待盤點 / 缺貨" : row.stock <= 10 ? "低庫存" : "正常";
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>櫃位</th>
+                <th>品項</th>
+                <th>推估庫存</th>
+                <th>狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.map((row) => {
+                const label = row.stock <= 0 ? "待盤點 / 缺貨" : row.stock <= 10 ? "低庫存" : "正常";
 
-              return (
-                <tr key={`${row.counterName}-${row.itemName}-${row.itemSpec}`}>
-                  <td>{row.counterName}</td>
-                  <td>
-                    {row.itemName}（{row.itemSpec}）
-                  </td>
-                  <td>{row.stock}</td>
-                  <td>
-                    <span className={label === "正常" ? "status" : "status warn"}>{label}</span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                return (
+                  <tr key={`${row.counterName}-${row.itemName}-${row.itemSpec}`}>
+                    <td>{row.counterName}</td>
+                    <td>
+                      {row.itemName}（{row.itemSpec}）
+                    </td>
+                    <td>{row.stock}</td>
+                    <td>
+                      <span className={label === "正常" ? "status" : "status warn"}>{label}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="panel data-card">
         <h2>異動紀錄</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>時間</th>
-              <th>櫃位</th>
-              <th>類型</th>
-              <th>品項</th>
-              <th>數量</th>
-              <th>備註</th>
-              <th>建立 / 更新</th>
-              <th>覆核</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {visibleMovements.map((movement) => (
-              <tr key={movement.id}>
-                <td>{formatTime(movement.createdAt)}</td>
-                <td>{movement.counterName}</td>
-                <td>{movement.movementLabel}</td>
-                <td>{movement.itemName}</td>
-                <td>{movement.countedQuantity ?? movement.quantity}</td>
-                <td>{movement.note ?? "-"}</td>
-                <td>
-                  {movement.createdByName}
-                  {movement.updatedByName ? `（${movement.updatedByName} 更新）` : ""}
-                </td>
-                <td>
-                  {movement.reviewedAt ? (
-                    <span className="status">{movement.reviewedByName} 已覆核</span>
-                  ) : reviewTypes.has(movement.movementType) ? (
-                    <span className="status warn">待覆核</span>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td>
-                  <div className="toolbar">
-                    {!movement.reviewedAt && reviewTypes.has(movement.movementType) ? (
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>時間</th>
+                <th>櫃位</th>
+                <th>類型</th>
+                <th>品項</th>
+                <th>數量</th>
+                <th>備註</th>
+                <th>建立 / 更新</th>
+                <th>覆核</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {visibleMovements.map((movement) => (
+                <tr key={movement.id}>
+                  <td>{formatTime(movement.createdAt)}</td>
+                  <td>{movement.counterName}</td>
+                  <td>{movement.movementLabel}</td>
+                  <td>{movement.itemName}</td>
+                  <td>{movement.countedQuantity ?? movement.quantity}</td>
+                  <td>{movement.note ?? "-"}</td>
+                  <td>
+                    {movement.createdByName}
+                    {movement.updatedByName ? `（${movement.updatedByName} 更新）` : ""}
+                  </td>
+                  <td>
+                    {movement.reviewedAt ? (
+                      <span className="status">{movement.reviewedByName} 已覆核</span>
+                    ) : reviewTypes.has(movement.movementType) ? (
+                      <span className="status warn">待覆核</span>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td>
+                    <div className="toolbar">
+                      {!movement.reviewedAt && reviewTypes.has(movement.movementType) ? (
+                        <button
+                          className="secondary-action"
+                          disabled={working}
+                          onClick={() => reviewMovement(movement)}
+                          type="button"
+                        >
+                          覆核
+                        </button>
+                      ) : null}
                       <button
                         className="secondary-action"
                         disabled={working}
-                        onClick={() => reviewMovement(movement)}
+                        onClick={() => deleteMovement(movement)}
                         type="button"
                       >
-                        覆核
+                        刪除
                       </button>
-                    ) : null}
-                    <button
-                      className="secondary-action"
-                      disabled={working}
-                      onClick={() => deleteMovement(movement)}
-                      type="button"
-                    >
-                      刪除
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </>
   );

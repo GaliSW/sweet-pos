@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   currentShiftStaff as fallbackStaff,
   counters as fallbackCounters,
@@ -66,6 +66,7 @@ export function PosRegister() {
   const [flavorNotice, setFlavorNotice] = useState("");
   const [notice, setNotice] = useState("待建立訂單");
   const [submitting, setSubmitting] = useState(false);
+  const cartPanelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setCounterId((current) => current || getSelectedCounterId());
@@ -563,7 +564,7 @@ export function PosRegister() {
           </div>
         </main>
 
-        <aside className="panel cart-panel" aria-label="購物車">
+        <aside className="panel cart-panel" aria-label="購物車" ref={cartPanelRef}>
           <div className="panel-header">
             <h2>訂單</h2>
             <span className="pill">{cart.length} 項</span>
@@ -680,6 +681,19 @@ export function PosRegister() {
           </div>
         </aside>
       </section>
+
+      {cart.length > 0 ? (
+        <button
+          className="cart-jump"
+          onClick={() =>
+            cartPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+          type="button"
+        >
+          <span>{cart.length} 項 · 查看訂單</span>
+          <strong>${totals.receivableAmount}</strong>
+        </button>
+      ) : null}
 
       {pendingGift ? (
         <div className="modal-backdrop" role="presentation">

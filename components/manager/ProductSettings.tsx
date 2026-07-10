@@ -200,48 +200,50 @@ export function ProductSettings() {
       <section className="content-grid">
         <article className="panel data-card">
           <h2>商品</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>品名</th>
-                <th>類型</th>
-                <th>規格</th>
-                <th>售價</th>
-                <th>狀態</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((product) => (
-                <tr key={product.id}>
-                  <td>{product.name}</td>
-                  <td>{product.category === "bag" ? "袋裝" : "禮盒"}</td>
-                  <td>{product.spec}</td>
-                  <td>${product.price}</td>
-                  <td>{product.isActive ? "啟用" : "停用"}</td>
-                  <td>
-                    <div className="toolbar">
-                      <button
-                        className="secondary-action"
-                        onClick={() => editProduct(product)}
-                        type="button"
-                      >
-                        編輯
-                      </button>
-                      <button
-                        className="secondary-action"
-                        disabled={saving}
-                        onClick={() => deleteProduct(product)}
-                        type="button"
-                      >
-                        刪除
-                      </button>
-                    </div>
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>品名</th>
+                  <th>類型</th>
+                  <th>規格</th>
+                  <th>售價</th>
+                  <th>狀態</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {products.map((product) => (
+                  <tr key={product.id}>
+                    <td>{product.name}</td>
+                    <td>{product.category === "bag" ? "袋裝" : "禮盒"}</td>
+                    <td>{product.spec}</td>
+                    <td>${product.price}</td>
+                    <td>{product.isActive ? "啟用" : "停用"}</td>
+                    <td>
+                      <div className="toolbar">
+                        <button
+                          className="secondary-action"
+                          onClick={() => editProduct(product)}
+                          type="button"
+                        >
+                          編輯
+                        </button>
+                        <button
+                          className="secondary-action"
+                          disabled={saving}
+                          onClick={() => deleteProduct(product)}
+                          type="button"
+                        >
+                          刪除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <article className="panel data-card form-stack">
@@ -373,40 +375,42 @@ export function ProductSettings() {
       <section className="content-grid">
         <article className="panel data-card">
           <h2>折扣</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>名稱</th>
-                <th>規則</th>
-                <th>最低消費</th>
-                <th>狀態</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {discounts.map((discount) => (
-                <tr key={discount.id}>
-                  <td>{discount.name}</td>
-                  <td>
-                    {discount.discountType === "percentage"
-                      ? `${Math.round(discount.value * 100) / 10} 折`
-                      : `折 $${discount.value}`}
-                  </td>
-                  <td>{discount.minOrderAmount ? `$${discount.minOrderAmount}` : "—"}</td>
-                  <td>{discount.isActive ? "啟用" : "停用"}</td>
-                  <td>
-                    <button
-                      className="secondary-action"
-                      onClick={() => editDiscount(discount)}
-                      type="button"
-                    >
-                      編輯
-                    </button>
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>名稱</th>
+                  <th>規則</th>
+                  <th>最低消費</th>
+                  <th>狀態</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {discounts.map((discount) => (
+                  <tr key={discount.id}>
+                    <td>{discount.name}</td>
+                    <td>
+                      {discount.discountType === "percentage"
+                        ? `${Math.round(discount.value * 100) / 10} 折`
+                        : `折 $${discount.value}`}
+                    </td>
+                    <td>{discount.minOrderAmount ? `$${discount.minOrderAmount}` : "—"}</td>
+                    <td>{discount.isActive ? "啟用" : "停用"}</td>
+                    <td>
+                      <button
+                        className="secondary-action"
+                        onClick={() => editDiscount(discount)}
+                        type="button"
+                      >
+                        編輯
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <article className="panel data-card form-stack">
