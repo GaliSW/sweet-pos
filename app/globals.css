@@ -1452,8 +1452,13 @@ tbody tr:last-child td {
 
 .schedule-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+/* 主要動作(發布)獨占一列全寬,次要動作並排,避免窄側欄三等分導致文字換行 */
+.schedule-actions .primary-action {
+  grid-column: 1 / -1;
 }
 
 .split-example {

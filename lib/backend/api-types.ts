@@ -140,6 +140,7 @@ export type UpsertProductInput = {
   spec: string;
   price: number;
   isActive?: boolean;
+  isPopular?: boolean;
   giftRule?: {
     selectionMode: "select" | "fixed";
     requiredFlavorCount?: number;

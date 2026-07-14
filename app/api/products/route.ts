@@ -20,6 +20,7 @@ export async function GET() {
           spec: product.spec,
           price: product.price,
           isActive: true,
+          isPopular: Boolean(product.popular),
           giftRule: product.giftRule
             ? {
                 selectionMode: product.giftRule.mode,
@@ -62,6 +63,7 @@ export async function GET() {
           spec: product.spec,
           price: Number(product.price),
           isActive: product.is_active,
+          isPopular: Boolean(product.is_popular),
           giftRule: rule
             ? {
                 selectionMode: rule.selection_mode,
@@ -104,7 +106,8 @@ export async function POST(request: Request) {
       name: input.name.trim(),
       spec: input.spec.trim(),
       price: input.price,
-      is_active: input.isActive ?? true
+      is_active: input.isActive ?? true,
+      is_popular: input.isPopular ?? false
     })
     .select("id")
     .single();
@@ -158,7 +161,8 @@ export async function PATCH(request: Request) {
       name: input.name.trim(),
       spec: input.spec.trim(),
       price: input.price,
-      is_active: input.isActive ?? true
+      is_active: input.isActive ?? true,
+      is_popular: input.isPopular ?? false
     })
     .eq("id", input.id)
     .select("id")

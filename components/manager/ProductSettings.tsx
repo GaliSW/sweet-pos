@@ -10,6 +10,7 @@ type ProductRow = {
   spec: string;
   price: number;
   isActive: boolean;
+  isPopular: boolean;
   giftRule: {
     selectionMode: "select" | "fixed";
     requiredFlavorCount: number;
@@ -32,6 +33,7 @@ const emptyProduct: UpsertProductInput = {
   spec: "",
   price: 0,
   isActive: true,
+  isPopular: false,
   giftRule: null
 };
 
@@ -81,6 +83,7 @@ export function ProductSettings() {
       spec: product.spec,
       price: product.price,
       isActive: product.isActive,
+      isPopular: product.isPopular,
       giftRule: product.giftRule
         ? {
             selectionMode: product.giftRule.selectionMode,
@@ -208,6 +211,7 @@ export function ProductSettings() {
                   <th>類型</th>
                   <th>規格</th>
                   <th>售價</th>
+                  <th>常用</th>
                   <th>狀態</th>
                   <th />
                 </tr>
@@ -219,6 +223,7 @@ export function ProductSettings() {
                     <td>{product.category === "bag" ? "袋裝" : "禮盒"}</td>
                     <td>{product.spec}</td>
                     <td>${product.price}</td>
+                    <td>{product.isPopular ? <span className="status">常用</span> : "—"}</td>
                     <td>{product.isActive ? "啟用" : "停用"}</td>
                     <td>
                       <div className="toolbar">
@@ -305,6 +310,18 @@ export function ProductSettings() {
               </select>
             </label>
           </div>
+          <label className="field">
+            <span>顯示在 POS「常用」分類</span>
+            <select
+              value={productForm.isPopular ? "yes" : "no"}
+              onChange={(event) =>
+                setProductForm({ ...productForm, isPopular: event.target.value === "yes" })
+              }
+            >
+              <option value="no">否</option>
+              <option value="yes">是(前台常用分類會列出)</option>
+            </select>
+          </label>
 
           {productForm.category === "gift_box" ? (
             <div className="field-row">
