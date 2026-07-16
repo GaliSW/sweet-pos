@@ -13,10 +13,11 @@ export type CreateOrderItemInput = {
 
 export type CreateOrderInput = {
   counterId: string;
-  sellerId: string;
+  // 銷售人員由後端依當下班表帶入,前端不再指定
+  sellerId?: string;
   cashierId?: string;
   discountId: string | null;
-  paymentMethod: "cash" | "credit_card" | "line_pay" | "jkopay";
+  paymentMethod: "cash" | "credit_card" | "line_pay" | "jkopay" | "transfer";
   items: CreateOrderItemInput[];
 };
 
@@ -33,6 +34,7 @@ export type ApiResult<T> =
 export type InventoryMovementType =
   | "opening_count"
   | "closing_count"
+  | "handover_count"
   | "purchase"
   | "sampling"
   | "waste"
@@ -48,6 +50,12 @@ export type CreateInventoryMovementInput = {
   countedQuantity?: number | null;
   note?: string;
   createdBy?: string;
+  // 批次進貨:一次多品項(有 items 時忽略單筆欄位)
+  items?: Array<{
+    productId?: string | null;
+    flavorId?: string | null;
+    quantity: number;
+  }>;
 };
 
 export type UpdateInventoryMovementInput = {
@@ -63,7 +71,9 @@ export type ShiftCode = "morning" | "evening";
 
 export type UpsertShiftInput = {
   counterId: string;
-  staffId: string | null;
+  // 共班:同班段可排最多 2 人(空陣列 = 清空該班段);staffId 為舊格式相容
+  staffIds?: (string | null)[];
+  staffId?: string | null;
   shiftDate: string;
   shiftCode: ShiftCode;
   startsAt: string;

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  currentShiftStaff as fallbackStaff,
   counters as fallbackCounters,
   discounts as fallbackDiscounts,
   flavors as fallbackFlavors,
@@ -53,14 +52,14 @@ export function PosRegister() {
     fallbackFlavors.map((name) => ({ id: null, name, spec: "6入/袋" }))
   );
   const [stockByKey, setStockByKey] = useState<Record<string, number> | null>(null);
-  const [staffOptions, setStaffOptions] = useState(
-    fallbackStaff.map((staff) => ({ id: staff.id, name: staff.name }))
-  );
   const [counters, setCounters] = useState(
     fallbackCounters.map((counter) => ({ id: counter.id, name: counter.name }))
   );
   const [counterId, setCounterId] = useState("");
-  const [sellerId, setSellerId] = useState(fallbackStaff[0]?.id ?? "");
+  const [onDutySellers, setOnDutySellers] = useState<
+    Array<{ id: string; displayName: string }>
+  >([]);
+  const [onDutyKnown, setOnDutyKnown] = useState(false);
   const [pendingGift, setPendingGift] = useState<Product | null>(null);
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [flavorNotice, setFlavorNotice] = useState("");
@@ -85,9 +84,32 @@ export function PosRegister() {
   }, []);
 
   useEffect(() => {
-    if (counterId) void loadStock(counterId);
+    if (counterId) {
+      void loadStock(counterId);
+      void loadOnDuty(counterId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [counterId]);
+
+  async function loadOnDuty(targetCounterId: string) {
+    try {
+      const result = await fetch(`/api/shifts/on-duty?counterId=${targetCounterId}`).then(
+        (response) => response.json()
+      );
+
+      if (result.ok && result.data.source === "supabase") {
+        setOnDutySellers(result.data.sellers ?? []);
+        setOnDutyKnown(true);
+        return;
+      }
+
+      setOnDutySellers([]);
+      setOnDutyKnown(false);
+    } catch {
+      setOnDutySellers([]);
+      setOnDutyKnown(false);
+    }
+  }
 
   async function loadStock(targetCounterId: string) {
     try {
@@ -121,12 +143,7 @@ export function PosRegister() {
 
   async function loadCatalog() {
     try {
-      const [catalogResult, meResult] = await Promise.all([
-        fetch("/api/catalog").then((response) => response.json()),
-        fetch("/api/me")
-          .then((response) => response.json())
-          .catch(() => null)
-      ]);
+      const catalogResult = await fetch("/api/catalog").then((response) => response.json());
 
       if (!catalogResult.ok) {
         setNotice(catalogResult.error);
@@ -139,20 +156,12 @@ export function PosRegister() {
       setProducts(mapped.products);
       setDiscounts(mapped.discounts);
       setFlavors(mapped.flavors);
-      setStaffOptions(mapped.staff);
       setCounters(mapped.counters);
       setCounterId((current) =>
         mapped.counters.some((counter) => counter.id === current)
           ? current
           : mapped.counters[0]?.id ?? ""
       );
-      setSellerId((current) => {
-        const meId = meResult?.ok ? (meResult.data.id as string) : null;
-
-        if (meId && mapped.staff.some((staff) => staff.id === meId)) return meId;
-        if (mapped.staff.some((staff) => staff.id === current)) return current;
-        return mapped.staff[0]?.id ?? "";
-      });
     } catch {
       setNotice("無法載入商品資料，使用示範資料");
     }
@@ -467,7 +476,6 @@ export function PosRegister() {
     }
 
     setSubmitting(true);
-    const seller = staffOptions.find((staff) => staff.id === sellerId)?.name ?? "未指定";
 
     try {
       const response = await fetch("/api/orders", {
@@ -477,7 +485,6 @@ export function PosRegister() {
         },
         body: JSON.stringify({
           counterId: counterId || counters[0]?.id,
-          sellerId,
           discountId: selectedDiscountId === "none" ? null : selectedDiscountId,
           paymentMethod,
           items: cart.map((item) => ({
@@ -494,8 +501,11 @@ export function PosRegister() {
         return;
       }
 
+      const sellerLabel =
+        (result.data.sellers as string[] | undefined)?.join("、") || "記在你名下";
+
       setNotice(
-        `訂單完成：${seller} / ${paymentLabel(paymentMethod)} / 應收 $${totals.receivableAmount}`
+        `訂單完成：${sellerLabel} / ${paymentLabel(paymentMethod)} / 應收 $${totals.receivableAmount}`
       );
       setCart([]);
       void loadStock(counterId);
@@ -639,18 +649,24 @@ export function PosRegister() {
                   <option value="credit_card">信用卡</option>
                   <option value="line_pay">LINE Pay</option>
                   <option value="jkopay">街口支付</option>
+                  <option value="transfer">轉帳</option>
                 </select>
               </label>
             </div>
             <label className="field">
-              <span>銷售人員</span>
-              <select value={sellerId} onChange={(event) => setSellerId(event.target.value)}>
-                {staffOptions.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.name}
-                  </option>
-                ))}
-              </select>
+              <span>銷售人員（依班表自動帶入）</span>
+              <input
+                value={
+                  onDutySellers.length > 0
+                    ? onDutySellers.map((seller) => seller.displayName).join("、") +
+                      (onDutySellers.length > 1 ? "（共班，業績各半）" : "")
+                    : onDutyKnown
+                      ? "目前無排班，將記在你名下"
+                      : "依登入者記錄"
+                }
+                disabled
+                readOnly
+              />
             </label>
             <div className="totals">
               <div className="total-line">
@@ -951,7 +967,8 @@ function paymentLabel(method: string) {
     cash: "現金",
     credit_card: "信用卡",
     line_pay: "LINE Pay",
-    jkopay: "街口支付"
+    jkopay: "街口支付",
+    transfer: "轉帳"
   };
 
   return labels[method] ?? method;

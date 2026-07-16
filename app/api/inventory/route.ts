@@ -9,13 +9,18 @@ import { relationDisplayName } from "@/lib/backend/query-helpers";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 
 const defaultStaffId = "00000000-0000-4000-8000-000000000001";
-const countTypes = new Set<InventoryMovementType>(["opening_count", "closing_count"]);
+const countTypes = new Set<InventoryMovementType>([
+  "opening_count",
+  "closing_count",
+  "handover_count"
+]);
 const deductionTypes = new Set<InventoryMovementType>(["sampling", "waste", "sale"]);
 const noteRequiredTypes = new Set<InventoryMovementType>(["sampling", "waste", "adjustment"]);
 
 const movementLabels: Record<InventoryMovementType, string> = {
   opening_count: "開班盤點",
   closing_count: "下班盤點",
+  handover_count: "交班盤點",
   purchase: "進貨",
   sampling: "試吃",
   waste: "報廢",
@@ -106,6 +111,69 @@ export async function POST(request: Request) {
   if (guard.failure) return guard.failure;
 
   const input = (await request.json()) as CreateInventoryMovementInput;
+  const createdBy =
+    guard.profile?.id ?? input.createdBy ?? process.env.DEMO_CASHIER_ID ?? defaultStaffId;
+
+  // 批次進貨:一次寫入多個品項(僅進貨用)
+  if (input.items && input.items.length > 0) {
+    if (!input.counterId) {
+      return NextResponse.json({ ok: false, error: "缺少櫃位" }, { status: 400 });
+    }
+
+    const rows = input.items
+      .map((item) => ({
+        productId: item.productId ?? null,
+        flavorId: item.flavorId ?? null,
+        quantity: Math.floor(Number(item.quantity))
+      }))
+      .filter((item) => item.quantity > 0);
+
+    if (rows.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "請至少輸入一個品項的進貨數量" },
+        { status: 400 }
+      );
+    }
+
+    for (const row of rows) {
+      if (Boolean(row.productId) === Boolean(row.flavorId)) {
+        return NextResponse.json(
+          { ok: false, error: "品項必須是袋裝商品或禮盒口味其中一種" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (!hasSupabaseAdminEnv()) {
+      return NextResponse.json({
+        ok: true,
+        data: { movementCount: rows.length, source: "demo" }
+      });
+    }
+
+    const supabase = createSupabaseAdminClient();
+    const { error } = await supabase.from("inventory_movements").insert(
+      rows.map((row) => ({
+        counter_id: input.counterId,
+        product_id: row.productId,
+        flavor_id: row.flavorId,
+        movement_type: "purchase",
+        quantity: row.quantity,
+        note: input.note?.trim() || null,
+        created_by: createdBy
+      }))
+    );
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      data: { movementCount: rows.length, source: "supabase" }
+    });
+  }
+
   const validation = validateInventoryInput(input);
 
   if (!validation.ok) {
@@ -124,8 +192,6 @@ export async function POST(request: Request) {
 
   const supabase = createSupabaseAdminClient();
   const normalizedQuantity = normalizeQuantity(input.movementType, input.quantity);
-  const createdBy =
-    guard.profile?.id ?? input.createdBy ?? process.env.DEMO_CASHIER_ID ?? defaultStaffId;
 
   const { data, error } = await supabase
     .from("inventory_movements")
@@ -216,7 +282,7 @@ export async function PATCH(request: Request) {
 
   if (countTypes.has(input.movementType) && !Number.isFinite(Number(input.countedQuantity))) {
     return NextResponse.json(
-      { ok: false, error: "開班與下班盤點需要填實際盤點庫存" },
+      { ok: false, error: "盤點類異動需要填實際盤點庫存" },
       { status: 400 }
     );
   }
@@ -329,7 +395,7 @@ function validateInventoryInput(input: CreateInventoryMovementInput) {
     return { ok: false as const, error: "異動數量必須是數字" };
   }
   if (countTypes.has(input.movementType) && !Number.isFinite(Number(input.countedQuantity))) {
-    return { ok: false as const, error: "開班與下班盤點需要填實際盤點庫存" };
+    return { ok: false as const, error: "盤點類異動需要填實際盤點庫存" };
   }
   if (noteRequiredTypes.has(input.movementType) && !input.note?.trim()) {
     return { ok: false as const, error: "試吃、報廢與調整需要填寫原因 / 備註" };

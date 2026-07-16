@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { InventoryMovementType } from "@/lib/backend/api-types";
+import { PurchaseModal } from "@/components/shared/PurchaseModal";
 import { counters as fallbackCounters } from "@/lib/domain/sample-data";
 
 type Movement = {
@@ -39,6 +40,7 @@ export function InventoryDashboard() {
   const [summary, setSummary] = useState<SummaryRow[]>([]);
   const [status, setStatus] = useState("讀取庫存資料中...");
   const [working, setWorking] = useState(false);
+  const [purchaseOpen, setPurchaseOpen] = useState(false);
 
   const visibleMovements = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -163,6 +165,15 @@ export function InventoryDashboard() {
               onChange={(event) => setSearch(event.target.value)}
             />
           </label>
+          <button
+            className="secondary-action"
+            disabled={counterId === "all"}
+            onClick={() => setPurchaseOpen(true)}
+            title={counterId === "all" ? "請先選擇櫃位再進貨" : undefined}
+            type="button"
+          >
+            進貨
+          </button>
           <span className="pill">{status}</span>
         </div>
       </section>
@@ -268,6 +279,19 @@ export function InventoryDashboard() {
           </table>
         </div>
       </section>
+
+      {purchaseOpen && counterId !== "all" ? (
+        <PurchaseModal
+          counterId={counterId}
+          counterName={counters.find((counter) => counter.id === counterId)?.name ?? ""}
+          onClose={() => setPurchaseOpen(false)}
+          onSaved={(message) => {
+            setPurchaseOpen(false);
+            setStatus(message);
+            void loadInventory();
+          }}
+        />
+      ) : null}
     </>
   );
 }

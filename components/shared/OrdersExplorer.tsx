@@ -49,6 +49,8 @@ type OrderRow = {
   counterName: string;
   sellerId: string;
   sellerName: string;
+  seller2Id: string | null;
+  seller2Name: string;
   cashierName: string;
   discountId: string | null;
   paymentMethod: string;
@@ -71,6 +73,7 @@ type EditDraft = {
   orderId: string;
   orderNo: string;
   sellerId: string;
+  seller2Id: string;
   discountId: string;
   paymentMethod: string;
   createdAt: string;
@@ -89,7 +92,8 @@ const paymentOptions = [
   { value: "cash", label: "現金" },
   { value: "credit_card", label: "信用卡" },
   { value: "line_pay", label: "LINE Pay" },
-  { value: "jkopay", label: "街口支付" }
+  { value: "jkopay", label: "街口支付" },
+  { value: "transfer", label: "轉帳" }
 ];
 
 export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
@@ -128,6 +132,8 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
         order.orderNo,
         order.counterName,
         order.sellerName,
+        order.seller2Name,
+        order.seller2Name ? "共班" : "",
         order.cashierName,
         order.paymentLabel,
         order.status === "voided" ? "已作廢" : "完成",
@@ -217,6 +223,7 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
       orderId: order.id,
       orderNo: order.orderNo,
       sellerId: order.sellerId,
+      seller2Id: order.seller2Id ?? "",
       discountId: order.discountId ?? "",
       paymentMethod: order.paymentMethod,
       createdAt: toDatetimeLocal(order.createdAt),
@@ -295,6 +302,7 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
         orderId: editDraft.orderId,
         action: "update",
         sellerId: editDraft.sellerId,
+        seller2Id: editDraft.seller2Id || null,
         discountId: editDraft.discountId || null,
         paymentMethod: editDraft.paymentMethod,
         createdAt: editDraft.createdAt ? new Date(editDraft.createdAt).toISOString() : null,
@@ -372,7 +380,7 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
                 <th>單號</th>
                 <th>櫃位</th>
                 <th>明細</th>
-                <th>銷售 / 收銀</th>
+                <th>銷售人員</th>
                 <th>付款</th>
                 <th>實收</th>
                 <th>狀態</th>
@@ -397,7 +405,8 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
                   </td>
                   <td>
                     {order.sellerName}
-                    {order.cashierName !== order.sellerName ? ` / ${order.cashierName}` : ""}
+                    {order.seller2Name ? `、${order.seller2Name}` : ""}
+                    {order.seller2Name ? <span className="status"> 共班</span> : null}
                   </td>
                   <td>{order.paymentLabel}</td>
                   <td>{formatCurrency(order.receivedAmount)}</td>
@@ -459,6 +468,9 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
                 <p>
                   {detailOrder.orderNo}｜{formatFullTime(detailOrder.createdAt)}｜
                   {detailOrder.counterName}｜銷售：{detailOrder.sellerName}
+                  {detailOrder.seller2Name
+                    ? `、${detailOrder.seller2Name}（共班，業績各半）`
+                    : ""}
                 </p>
               </div>
               <span className={detailOrder.status === "voided" ? "status warn" : "status"}>
@@ -556,7 +568,7 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
             <div className="order-modal-body">
             <div className="field-row">
               <label className="field">
-                <span>業績歸屬</span>
+                <span>業績歸屬（主銷售）</span>
                 <select
                   value={editDraft.sellerId}
                   onChange={(event) =>
@@ -568,6 +580,24 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
                       {staff.name}
                     </option>
                   ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>第二銷售（共班，業績各半）</span>
+                <select
+                  value={editDraft.seller2Id}
+                  onChange={(event) =>
+                    setEditDraft({ ...editDraft, seller2Id: event.target.value })
+                  }
+                >
+                  <option value="">無</option>
+                  {staffOptions
+                    .filter((staff) => staff.id !== editDraft.sellerId)
+                    .map((staff) => (
+                      <option key={staff.id} value={staff.id}>
+                        {staff.name}
+                      </option>
+                    ))}
                 </select>
               </label>
               <label className="field">

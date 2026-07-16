@@ -7,7 +7,7 @@ import {
   taipeiDayStart
 } from "@/lib/backend/query-helpers";
 import { requireRole } from "@/lib/auth/guards";
-import { fetchCommissionTiers } from "@/lib/backend/commission";
+import { fetchCommissionTierSets, resolveTiers } from "@/lib/backend/commission";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 import { calculateCommissionByTiers } from "@/lib/domain/pos-rules";
 
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 
   let ordersQuery = supabase
     .from("orders")
-    .select("seller_id, counter_id, received_amount, created_at")
+    .select("seller_id, seller2_id, counter_id, received_amount, created_at")
     .eq("status", "completed")
     .gte("created_at", taipeiDayStart(startDate))
     .lt("created_at", taipeiDayStart(endDate));
@@ -56,11 +56,11 @@ export async function GET(request: Request) {
     ordersQuery = ordersQuery.eq("counter_id", counterId);
   }
 
-  const [shiftsResult, ordersResult, profilesResult, tiers] = await Promise.all([
+  const [shiftsResult, ordersResult, profilesResult, tierSets] = await Promise.all([
     shiftsQuery,
     ordersQuery,
     supabase.from("profiles").select("id, display_name, hourly_wage").eq("role", "staff"),
-    fetchCommissionTiers(supabase)
+    fetchCommissionTierSets(supabase)
   ]);
 
   const error = shiftsResult.error ?? ordersResult.error ?? profilesResult.error;
@@ -108,13 +108,21 @@ export async function GET(request: Request) {
   const sellerDayReceived = new Map<string, number>();
 
   for (const order of ordersResult.data ?? []) {
-    const key = `${taipeiDate(order.created_at)}|${order.seller_id}`;
-    sellerDayReceived.set(key, (sellerDayReceived.get(key) ?? 0) + Number(order.received_amount));
+    // 共班訂單掛兩位銷售,實收金額均分計入各自的日業績
+    const sellerIds = [order.seller_id, order.seller2_id].filter(Boolean) as string[];
+    const share = Number(order.received_amount) / sellerIds.length;
+    const date = taipeiDate(order.created_at);
+
+    for (const sellerId of sellerIds) {
+      const key = `${date}|${sellerId}`;
+      sellerDayReceived.set(key, (sellerDayReceived.get(key) ?? 0) + share);
+    }
   }
 
   for (const [key, received] of sellerDayReceived) {
-    const row = rowFor(key.split("|")[1]);
-    row.commission += calculateCommissionByTiers(received, tiers);
+    const staffId = key.split("|")[1];
+    const row = rowFor(staffId);
+    row.commission += calculateCommissionByTiers(received, resolveTiers(tierSets, staffId));
   }
 
   const payroll = Array.from(rows.values())

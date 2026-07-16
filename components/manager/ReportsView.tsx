@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   CounterTargetRow,
   DailyPerformanceRow,
@@ -49,8 +49,33 @@ export function ReportsView() {
   const [to, setTo] = useState(today);
   const [counterId, setCounterId] = useState("all");
   const [counters, setCounters] = useState<CounterOption[]>([]);
+  const [dailySellerId, setDailySellerId] = useState("all");
   const [report, setReport] = useState<ReportData | null>(null);
   const [status, setStatus] = useState("讀取報表中...");
+
+  // 每日業績的員工篩選選項(從報表資料蒐集);Excel 匯出仍是全量
+  const dailySellerOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    for (const row of report?.daily ?? []) {
+      map.set(row.sellerId, row.sellerName);
+    }
+
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [report]);
+
+  // 換區間後若選到的員工不在資料內,退回顯示全部
+  const activeDailySellerId = dailySellerOptions.some((seller) => seller.id === dailySellerId)
+    ? dailySellerId
+    : "all";
+
+  const visibleDaily = useMemo(() => {
+    const rows = report?.daily ?? [];
+
+    if (activeDailySellerId === "all") return rows;
+
+    return rows.filter((row) => row.sellerId === activeDailySellerId);
+  }, [report, activeDailySellerId]);
 
   useEffect(() => {
     void loadCounters();
@@ -280,7 +305,23 @@ export function ReportsView() {
       </section>
 
       <section className="panel data-card">
-        <h2>每日員工業績</h2>
+        <div className="panel-header">
+          <h2>每日員工業績</h2>
+          <label className="field compact">
+            <span>員工</span>
+            <select
+              value={activeDailySellerId}
+              onChange={(event) => setDailySellerId(event.target.value)}
+            >
+              <option value="all">全部</option>
+              {dailySellerOptions.map((seller) => (
+                <option key={seller.id} value={seller.id}>
+                  {seller.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="table-scroll">
           <table>
             <thead>
@@ -296,7 +337,7 @@ export function ReportsView() {
               </tr>
             </thead>
             <tbody>
-              {(report?.daily ?? []).map((row) => (
+              {visibleDaily.map((row) => (
                 <tr key={`${row.date}-${row.sellerId}-${row.counterId}`}>
                   <td>{row.date}</td>
                   <td>{row.sellerName}</td>
@@ -308,7 +349,7 @@ export function ReportsView() {
                   <td>{formatCurrency(row.commission)}</td>
                 </tr>
               ))}
-              {report && report.daily.length === 0 ? (
+              {report && visibleDaily.length === 0 ? (
                 <tr>
                   <td colSpan={8}>此區間沒有訂單</td>
                 </tr>

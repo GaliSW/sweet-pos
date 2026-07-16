@@ -1,27 +1,36 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/guards";
-import { fetchCommissionTiers } from "@/lib/backend/commission";
+import { fetchCommissionTierSets } from "@/lib/backend/commission";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 import { defaultCommissionTiers, type CommissionTier } from "@/lib/domain/pos-rules";
 
-export async function GET() {
+export async function GET(request: Request) {
   const guard = await requireRole("manager");
 
   if (guard.failure) return guard.failure;
 
+  const { searchParams } = new URL(request.url);
+  const staffId = searchParams.get("staffId");
+
   if (!hasSupabaseAdminEnv()) {
     return NextResponse.json({
       ok: true,
-      data: { tiers: defaultCommissionTiers, source: "demo" }
+      data: { tiers: defaultCommissionTiers, staffId, staffTiers: null, source: "demo" }
     });
   }
 
   const supabase = createSupabaseAdminClient();
-  const tiers = await fetchCommissionTiers(supabase);
+  const sets = await fetchCommissionTierSets(supabase);
 
   return NextResponse.json({
     ok: true,
-    data: { tiers, source: "supabase" }
+    data: {
+      tiers: sets.global,
+      staffId,
+      // 個人覆寫級距;null = 未設定(套用全域)
+      staffTiers: staffId ? sets.byStaff.get(staffId) ?? null : null,
+      source: "supabase"
+    }
   });
 }
 
@@ -30,10 +39,12 @@ export async function PUT(request: Request) {
 
   if (guard.failure) return guard.failure;
 
-  const input = (await request.json()) as { tiers?: CommissionTier[] };
+  const input = (await request.json()) as { tiers?: CommissionTier[]; staffId?: string | null };
   const tiers = input.tiers ?? [];
+  const staffId = input.staffId ?? null;
 
-  if (tiers.length === 0) {
+  // 個人覆寫允許空陣列 = 清除覆寫、回到全域級距;全域至少要有一個級距
+  if (!staffId && tiers.length === 0) {
     return NextResponse.json({ ok: false, error: "至少需要一個抽成級距" }, { status: 400 });
   }
 
@@ -66,30 +77,38 @@ export async function PUT(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
-  const { error: deleteError } = await supabase
-    .from("commission_tiers")
-    .delete()
-    .gte("min_daily_sales", 0);
+  let deleteQuery = supabase.from("commission_tiers").delete();
+
+  deleteQuery = staffId ? deleteQuery.eq("staff_id", staffId) : deleteQuery.is("staff_id", null);
+
+  const { error: deleteError } = await deleteQuery;
 
   if (deleteError) {
     return NextResponse.json({ ok: false, error: deleteError.message }, { status: 400 });
   }
 
-  const { error: insertError } = await supabase.from("commission_tiers").insert(
-    tiers.map((tier) => ({
-      min_daily_sales: Number(tier.minDailySales),
-      rate: Number(tier.rate)
-    }))
-  );
+  if (tiers.length > 0) {
+    const { error: insertError } = await supabase.from("commission_tiers").insert(
+      tiers.map((tier) => ({
+        staff_id: staffId,
+        min_daily_sales: Number(tier.minDailySales),
+        rate: Number(tier.rate)
+      }))
+    );
 
-  if (insertError) {
-    return NextResponse.json({ ok: false, error: insertError.message }, { status: 400 });
+    if (insertError) {
+      return NextResponse.json({ ok: false, error: insertError.message }, { status: 400 });
+    }
   }
+
+  const sets = await fetchCommissionTierSets(supabase);
 
   return NextResponse.json({
     ok: true,
     data: {
-      tiers: await fetchCommissionTiers(supabase),
+      tiers: sets.global,
+      staffId,
+      staffTiers: staffId ? sets.byStaff.get(staffId) ?? null : null,
       source: "supabase"
     }
   });

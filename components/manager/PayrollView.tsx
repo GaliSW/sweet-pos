@@ -21,24 +21,59 @@ export function PayrollView() {
   const [monthly, setMonthly] = useState<MonthlyPerformanceRow[]>([]);
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
   const [tiers, setTiers] = useState<CommissionTier[]>([]);
+  const [staffList, setStaffList] = useState<Array<{ id: string; name: string }>>([]);
+  const [tierStaffId, setTierStaffId] = useState("");
+  const [hasOverride, setHasOverride] = useState(false);
   const [savingTiers, setSavingTiers] = useState(false);
   const [status, setStatus] = useState("讀取薪資資料中...");
 
   useEffect(() => {
-    void loadTiers();
+    void loadStaffList();
   }, []);
+
+  useEffect(() => {
+    void loadTiers(tierStaffId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tierStaffId]);
 
   useEffect(() => {
     void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month]);
 
-  async function loadTiers() {
-    const result = await fetch("/api/commission")
+  async function loadStaffList() {
+    const result = await fetch("/api/catalog")
       .then((response) => response.json())
       .catch(() => null);
 
-    if (result?.ok) setTiers(result.data.tiers ?? []);
+    if (!result?.ok) return;
+
+    setStaffList(
+      (result.data.staff ?? []).map(
+        (staff: { id: string; display_name?: string; name?: string }) => ({
+          id: staff.id,
+          name: staff.display_name ?? staff.name ?? "未命名員工"
+        })
+      )
+    );
+  }
+
+  async function loadTiers(staffId: string) {
+    const url = staffId ? `/api/commission?staffId=${staffId}` : "/api/commission";
+    const result = await fetch(url)
+      .then((response) => response.json())
+      .catch(() => null);
+
+    if (!result?.ok) return;
+
+    if (staffId) {
+      setHasOverride(result.data.staffTiers != null);
+      setTiers(result.data.staffTiers ?? result.data.tiers ?? []);
+      return;
+    }
+
+    setHasOverride(false);
+    setTiers(result.data.tiers ?? []);
   }
 
   function updateTier(index: number, partial: Partial<CommissionTier>) {
@@ -54,7 +89,7 @@ export function PayrollView() {
     const response = await fetch("/api/commission", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ tiers })
+      body: JSON.stringify({ tiers, staffId: tierStaffId || null })
     });
     const result = await response.json();
 
@@ -65,8 +100,41 @@ export function PayrollView() {
       return;
     }
 
-    setTiers(result.data.tiers ?? tiers);
-    setStatus("抽成級距已更新，報表與薪資即時生效");
+    if (tierStaffId) {
+      setHasOverride(result.data.staffTiers != null);
+      setTiers(result.data.staffTiers ?? result.data.tiers ?? tiers);
+      setStatus(`${tierStaffName || "該員工"} 的個人抽成級距已更新`);
+    } else {
+      setTiers(result.data.tiers ?? tiers);
+      setStatus("全域抽成級距已更新，報表與薪資即時生效");
+    }
+
+    await loadData();
+  }
+
+  async function clearOverride() {
+    if (!tierStaffId) return;
+
+    setSavingTiers(true);
+    setStatus("清除個人級距中...");
+
+    const response = await fetch("/api/commission", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ tiers: [], staffId: tierStaffId })
+    });
+    const result = await response.json();
+
+    setSavingTiers(false);
+
+    if (!result.ok) {
+      setStatus(result.error);
+      return;
+    }
+
+    setHasOverride(false);
+    setTiers(result.data.tiers ?? []);
+    setStatus(`${tierStaffName || "該員工"} 已恢復使用全域級距`);
     await loadData();
   }
 
@@ -92,6 +160,7 @@ export function PayrollView() {
   }
 
   const totalPay = payroll.reduce((total, row) => total + row.estimatedTotal, 0);
+  const tierStaffName = staffList.find((staff) => staff.id === tierStaffId)?.name ?? "";
 
   return (
     <>
@@ -151,6 +220,30 @@ export function PayrollView() {
         <p className="form-status">
           當日個人業績達到門檻時，整筆業績依該級距比例抽成（取符合的最高門檻）。例如 2% 填 0.02。
         </p>
+        <div className="field-row">
+          <label className="field">
+            <span>適用對象</span>
+            <select
+              value={tierStaffId}
+              onChange={(event) => setTierStaffId(event.target.value)}
+            >
+              <option value="">全域預設（未個別設定者適用）</option>
+              {staffList.map((staff) => (
+                <option key={staff.id} value={staff.id}>
+                  {staff.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {tierStaffId ? (
+            <label className="field">
+              <span>&nbsp;</span>
+              <span className={hasOverride ? "status warn" : "status"}>
+                {hasOverride ? "使用個人級距" : "目前套用全域級距，儲存後改用個人級距"}
+              </span>
+            </label>
+          ) : null}
+        </div>
         {tiers.map((tier, index) => (
           <div className="field-row" key={index}>
             <label className="field">
@@ -199,13 +292,23 @@ export function PayrollView() {
           >
             新增級距
           </button>
+          {tierStaffId && hasOverride ? (
+            <button
+              className="secondary-action"
+              disabled={savingTiers}
+              onClick={clearOverride}
+              type="button"
+            >
+              恢復使用全域預設
+            </button>
+          ) : null}
           <button
             className="primary-action slim"
             disabled={savingTiers}
             onClick={saveTiers}
             type="button"
           >
-            儲存級距
+            {tierStaffId ? `儲存 ${tierStaffName || "個人"} 級距` : "儲存全域級距"}
           </button>
         </div>
       </section>

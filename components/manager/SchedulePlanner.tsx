@@ -12,6 +12,9 @@ type ScheduleSlot = {
 type ShiftAssignment = {
   staffId: string | null;
   staffName: string;
+  // 共班第二人(選填)
+  staff2Id: string | null;
+  staff2Name: string;
   startsAt: string;
   endsAt: string;
   published: boolean;
@@ -141,10 +144,22 @@ export function SchedulePlanner() {
 
     const nextAssignments: Record<string, ShiftAssignment> = {};
 
+    // 同一班段可能有兩列(共班):第一列當主班,第二列當副班
     for (const shift of result.data.shifts ?? []) {
-      nextAssignments[slotKey(shift.shiftDate, shift.shiftCode)] = {
+      const key = slotKey(shift.shiftDate, shift.shiftCode);
+      const existing = nextAssignments[key];
+
+      if (existing && existing.staffId && shift.staffId !== existing.staffId) {
+        existing.staff2Id = shift.staffId;
+        existing.staff2Name = shift.staffName;
+        continue;
+      }
+
+      nextAssignments[key] = {
         staffId: shift.staffId,
         staffName: shift.staffName,
+        staff2Id: null,
+        staff2Name: "",
         startsAt: shift.startsAt,
         endsAt: shift.endsAt,
         published: shift.published
@@ -159,7 +174,21 @@ export function SchedulePlanner() {
     const staff = staffOptions.find((option) => option.id === staffId);
     updateSelectedAssignment({
       staffId: staffId || null,
-      staffName: staff?.name ?? "未排"
+      staffName: staff?.name ?? "未排",
+      // 主班與副班相同時自動清掉副班
+      ...(staffId && staffId === selectedAssignment.staff2Id
+        ? { staff2Id: null, staff2Name: "" }
+        : {}),
+      // 清空主班時整班清空
+      ...(staffId ? {} : { staff2Id: null, staff2Name: "" })
+    });
+  }
+
+  function assignStaff2(staffId: string) {
+    const staff = staffOptions.find((option) => option.id === staffId);
+    updateSelectedAssignment({
+      staff2Id: staffId || null,
+      staff2Name: staff?.name ?? ""
     });
   }
 
@@ -193,7 +222,7 @@ export function SchedulePlanner() {
 
     const payload: UpsertShiftInput = {
       counterId,
-      staffId: selectedAssignment.staffId,
+      staffIds: [selectedAssignment.staffId, selectedAssignment.staff2Id].filter(Boolean),
       shiftDate: selectedSlot.date,
       shiftCode: selectedSlot.shiftCode,
       startsAt: selectedAssignment.startsAt,
@@ -326,7 +355,10 @@ export function SchedulePlanner() {
                       {shiftLabels[shiftCode]}
                       {assignment.staffId ? (assignment.published ? " ✓已發布" : " ・草稿") : ""}
                     </span>
-                    <strong>{assignment.staffName}</strong>
+                    <strong>
+                      {assignment.staffName}
+                      {assignment.staff2Name ? `、${assignment.staff2Name}` : ""}
+                    </strong>
                     <small>
                       {assignment.startsAt}-{assignment.endsAt} / {calculateHours(assignment)}h
                     </small>
@@ -380,7 +412,7 @@ export function SchedulePlanner() {
         </div>
 
         <label className="field">
-          <span>指派員工</span>
+          <span>指派員工（主班）</span>
           <select
             value={selectedAssignment.staffId ?? ""}
             onChange={(event) => assignStaff(event.target.value)}
@@ -391,6 +423,24 @@ export function SchedulePlanner() {
                 {staff.name}
               </option>
             ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span>共班人員（選填，業績各半）</span>
+          <select
+            disabled={!selectedAssignment.staffId}
+            value={selectedAssignment.staff2Id ?? ""}
+            onChange={(event) => assignStaff2(event.target.value)}
+          >
+            <option value="">無</option>
+            {staffOptions
+              .filter((staff) => staff.id !== selectedAssignment.staffId)
+              .map((staff) => (
+                <option key={staff.id} value={staff.id}>
+                  {staff.name}
+                </option>
+              ))}
           </select>
         </label>
 
@@ -464,6 +514,8 @@ function createDefaultAssignment(shiftCode: ShiftCode): ShiftAssignment {
   return {
     staffId: null,
     staffName: "未排",
+    staff2Id: null,
+    staff2Name: "",
     published: false,
     ...defaultShiftTimes[shiftCode]
   };

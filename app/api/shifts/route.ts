@@ -95,24 +95,37 @@ export async function POST(request: Request) {
 
   const supabase = createSupabaseAdminClient();
 
-  if (!input.staffId) {
-    const { error } = await supabase
-      .from("shifts")
-      .delete()
-      .match({
-        counter_id: input.counterId,
-        shift_date: input.shiftDate,
-        shift_code: input.shiftCode
-      });
+  // 共班:同班段最多 2 人。以「刪除該班段全部列、重建每人一列」取代 upsert。
+  const staffIds = Array.from(
+    new Set(
+      (input.staffIds ?? (input.staffId ? [input.staffId] : [])).filter(
+        (id): id is string => Boolean(id)
+      )
+    )
+  );
 
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-    }
+  if (staffIds.length > 2) {
+    return NextResponse.json({ ok: false, error: "同一班段最多排 2 人" }, { status: 400 });
+  }
 
+  const { error: deleteError } = await supabase
+    .from("shifts")
+    .delete()
+    .match({
+      counter_id: input.counterId,
+      shift_date: input.shiftDate,
+      shift_code: input.shiftCode
+    });
+
+  if (deleteError) {
+    return NextResponse.json({ ok: false, error: deleteError.message }, { status: 400 });
+  }
+
+  if (staffIds.length === 0) {
     return NextResponse.json({
       ok: true,
       data: {
-        shiftId: null,
+        shiftIds: [],
         source: "supabase"
       }
     });
@@ -120,22 +133,18 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("shifts")
-    .upsert(
-      {
+    .insert(
+      staffIds.map((staffId) => ({
         counter_id: input.counterId,
-        staff_id: input.staffId,
+        staff_id: staffId,
         shift_date: input.shiftDate,
         shift_code: input.shiftCode,
         starts_at: input.startsAt,
         ends_at: input.endsAt,
         published: input.published ?? false
-      },
-      {
-        onConflict: "counter_id,shift_date,shift_code"
-      }
+      }))
     )
-    .select("id")
-    .single();
+    .select("id");
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
@@ -144,7 +153,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     data: {
-      shiftId: data.id,
+      shiftIds: (data ?? []).map((row) => row.id as string),
       source: "supabase"
     }
   });

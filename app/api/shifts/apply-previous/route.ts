@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 
   const { error: upsertError } = await supabase
     .from("shifts")
-    .upsert(rows, { onConflict: "counter_id,shift_date,shift_code" });
+    .upsert(rows, { onConflict: "counter_id,shift_date,shift_code,staff_id" });
 
   if (upsertError) {
     return NextResponse.json({ ok: false, error: upsertError.message }, { status: 400 });

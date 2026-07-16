@@ -14,12 +14,11 @@ import {
   taipeiDayStart
 } from "@/lib/backend/query-helpers";
 import { requireRole } from "@/lib/auth/guards";
-import { fetchCommissionTiers } from "@/lib/backend/commission";
+import { fetchCommissionTierSets, resolveTiers } from "@/lib/backend/commission";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 import {
   calculateCommissionByTiers,
-  calculateDailyCommission,
-  type CommissionTier
+  calculateDailyCommission
 } from "@/lib/domain/pos-rules";
 
 export async function GET(request: Request) {
@@ -52,7 +51,7 @@ export async function GET(request: Request) {
   let ordersQuery = supabase
     .from("orders")
     .select(
-      "id, created_at, seller_id, counter_id, discount_id, sales_amount, discount_amount, received_amount, profiles!orders_seller_id_fkey(display_name), counters(name)"
+      "id, created_at, seller_id, seller2_id, counter_id, discount_id, sales_amount, discount_amount, received_amount, seller:profiles!orders_seller_id_fkey(display_name), seller2:profiles!orders_seller2_id_fkey(display_name), counters(name)"
     )
     .eq("status", "completed")
     .gte("created_at", taipeiDayStart(from))
@@ -63,7 +62,9 @@ export async function GET(request: Request) {
   }
 
   if (isStaff && guard.profile) {
-    ordersQuery = ordersQuery.eq("seller_id", guard.profile.id);
+    ordersQuery = ordersQuery.or(
+      `seller_id.eq.${guard.profile.id},seller2_id.eq.${guard.profile.id}`
+    );
   }
 
   let targetsQuery = supabase
@@ -78,10 +79,10 @@ export async function GET(request: Request) {
     targetsQuery = targetsQuery.eq("counter_id", counterId);
   }
 
-  const [ordersResult, targetsResult, tiers] = await Promise.all([
+  const [ordersResult, targetsResult, tierSets] = await Promise.all([
     ordersQuery,
     targetsQuery,
-    fetchCommissionTiers(supabase)
+    fetchCommissionTierSets(supabase)
   ]);
   const error = ordersResult.error ?? targetsResult.error;
 
@@ -92,8 +93,13 @@ export async function GET(request: Request) {
   const orders = (ordersResult.data ?? []).map((order) => ({
     id: order.id as string,
     date: taipeiDate(order.created_at),
-    sellerId: order.seller_id as string,
-    sellerName: relationDisplayName(order.profiles),
+    // 共班訂單掛兩位銷售,業績金額由兩人均分
+    sellers: [
+      { id: order.seller_id as string, name: relationDisplayName(order.seller) },
+      ...(order.seller2_id
+        ? [{ id: order.seller2_id as string, name: relationDisplayName(order.seller2) }]
+        : [])
+    ],
     counterId: order.counter_id as string,
     counterName: relationName(order.counters),
     discountId: order.discount_id as string | null,
@@ -109,53 +115,61 @@ export async function GET(request: Request) {
 
   for (const order of orders) {
     const month = order.date.slice(0, 7);
-    const dailyKey = `${order.date}|${order.sellerId}|${order.counterId}`;
-    const dailyRow =
-      daily.get(dailyKey) ??
-      {
-        date: order.date,
-        sellerId: order.sellerId,
-        sellerName: order.sellerName,
-        counterId: order.counterId,
-        counterName: order.counterName,
-        orderCount: 0,
-        salesAmount: 0,
-        discountAmount: 0,
-        receivedAmount: 0,
-        commission: 0
-      };
+    const share = 1 / order.sellers.length;
 
-    dailyRow.orderCount += 1;
-    dailyRow.salesAmount = roundCurrency(dailyRow.salesAmount + order.salesAmount);
-    dailyRow.discountAmount = roundCurrency(dailyRow.discountAmount + order.discountAmount);
-    dailyRow.receivedAmount = roundCurrency(dailyRow.receivedAmount + order.receivedAmount);
-    daily.set(dailyKey, dailyRow);
+    for (const seller of order.sellers) {
+      const salesShare = roundCurrency(order.salesAmount * share);
+      const discountShare = roundCurrency(order.discountAmount * share);
+      const receivedShare = roundCurrency(order.receivedAmount * share);
 
-    const monthlyKey = `${month}|${order.sellerId}`;
-    const monthlyRow =
-      monthly.get(monthlyKey) ??
-      {
-        month,
-        sellerId: order.sellerId,
-        sellerName: order.sellerName,
-        orderCount: 0,
-        salesAmount: 0,
-        discountAmount: 0,
-        receivedAmount: 0,
-        commission: 0
-      };
+      const dailyKey = `${order.date}|${seller.id}|${order.counterId}`;
+      const dailyRow =
+        daily.get(dailyKey) ??
+        {
+          date: order.date,
+          sellerId: seller.id,
+          sellerName: seller.name,
+          counterId: order.counterId,
+          counterName: order.counterName,
+          orderCount: 0,
+          salesAmount: 0,
+          discountAmount: 0,
+          receivedAmount: 0,
+          commission: 0
+        };
 
-    monthlyRow.orderCount += 1;
-    monthlyRow.salesAmount = roundCurrency(monthlyRow.salesAmount + order.salesAmount);
-    monthlyRow.discountAmount = roundCurrency(monthlyRow.discountAmount + order.discountAmount);
-    monthlyRow.receivedAmount = roundCurrency(monthlyRow.receivedAmount + order.receivedAmount);
-    monthly.set(monthlyKey, monthlyRow);
+      dailyRow.orderCount += 1;
+      dailyRow.salesAmount = roundCurrency(dailyRow.salesAmount + salesShare);
+      dailyRow.discountAmount = roundCurrency(dailyRow.discountAmount + discountShare);
+      dailyRow.receivedAmount = roundCurrency(dailyRow.receivedAmount + receivedShare);
+      daily.set(dailyKey, dailyRow);
 
-    const sellerDayKey = `${order.date}|${order.sellerId}`;
-    sellerDayReceived.set(
-      sellerDayKey,
-      roundCurrency((sellerDayReceived.get(sellerDayKey) ?? 0) + order.receivedAmount)
-    );
+      const monthlyKey = `${month}|${seller.id}`;
+      const monthlyRow =
+        monthly.get(monthlyKey) ??
+        {
+          month,
+          sellerId: seller.id,
+          sellerName: seller.name,
+          orderCount: 0,
+          salesAmount: 0,
+          discountAmount: 0,
+          receivedAmount: 0,
+          commission: 0
+        };
+
+      monthlyRow.orderCount += 1;
+      monthlyRow.salesAmount = roundCurrency(monthlyRow.salesAmount + salesShare);
+      monthlyRow.discountAmount = roundCurrency(monthlyRow.discountAmount + discountShare);
+      monthlyRow.receivedAmount = roundCurrency(monthlyRow.receivedAmount + receivedShare);
+      monthly.set(monthlyKey, monthlyRow);
+
+      const sellerDayKey = `${order.date}|${seller.id}`;
+      sellerDayReceived.set(
+        sellerDayKey,
+        roundCurrency((sellerDayReceived.get(sellerDayKey) ?? 0) + receivedShare)
+      );
+    }
 
     const counterMonthKey = `${order.counterId}|${month}`;
     counterMonthReceived.set(
@@ -164,11 +178,11 @@ export async function GET(request: Request) {
     );
   }
 
-  // 抽成一日一算:以「當日 × 個人」合計套級距,再按各櫃位列的實收比例分攤,
-  // 避免跨列或跨日累積業績造成級距誤判。
+  // 抽成一日一算:以「當日 × 個人」合計(共班已各半)套該員工的級距(個人覆寫優先),
+  // 再按各櫃位列的實收比例分攤,避免跨列或跨日累積業績造成級距誤判。
   for (const row of daily.values()) {
     const dayTotal = sellerDayReceived.get(`${row.date}|${row.sellerId}`) ?? 0;
-    const dayCommission = calculateCommissionByTiers(dayTotal, tiers);
+    const dayCommission = calculateCommissionByTiers(dayTotal, resolveTiers(tierSets, row.sellerId));
 
     row.commission =
       dayTotal > 0 ? Math.round((dayCommission * row.receivedAmount) / dayTotal) : 0;
@@ -180,11 +194,25 @@ export async function GET(request: Request) {
     const monthlyRow = monthly.get(`${month}|${sellerId}`);
 
     if (monthlyRow) {
-      monthlyRow.commission += calculateCommissionByTiers(received, tiers);
+      monthlyRow.commission += calculateCommissionByTiers(
+        received,
+        resolveTiers(tierSets, sellerId)
+      );
     }
   }
 
-  const summary = buildSummary(orders);
+  let dailyRows = sortDaily(Array.from(daily.values()));
+  let monthlyRows = sortMonthly(Array.from(monthly.values()));
+
+  // 員工只看到自己的列(共班訂單只顯示自己的那一半)
+  if (isStaff && guard.profile) {
+    const selfId = guard.profile.id;
+    dailyRows = dailyRows.filter((row) => row.sellerId === selfId);
+    monthlyRows = monthlyRows.filter((row) => row.sellerId === selfId);
+  }
+
+  const summary =
+    isStaff && guard.profile ? buildSummaryFromDaily(dailyRows) : buildSummary(orders);
 
   const targets: CounterTargetRow[] = (isStaff ? [] : targetsResult.data ?? []).map((target) => {
     const month = String(target.month).slice(0, 7);
@@ -210,8 +238,8 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     data: {
-      daily: sortDaily(Array.from(daily.values())),
-      monthly: sortMonthly(Array.from(monthly.values())),
+      daily: dailyRows,
+      monthly: monthlyRows,
       summary,
       targets,
       ...analytics,
@@ -397,6 +425,25 @@ function relationCategory(value: unknown) {
   if (Array.isArray(value)) return String(value[0]?.category ?? "bag");
   if (value && typeof value === "object" && "category" in value) return String(value.category);
   return "bag";
+}
+
+function buildSummaryFromDaily(rows: DailyPerformanceRow[]): ReportSummary {
+  const orderCount = rows.reduce((total, row) => total + row.orderCount, 0);
+  const salesAmount = roundCurrency(rows.reduce((total, row) => total + row.salesAmount, 0));
+  const discountAmount = roundCurrency(
+    rows.reduce((total, row) => total + row.discountAmount, 0)
+  );
+  const receivedAmount = roundCurrency(
+    rows.reduce((total, row) => total + row.receivedAmount, 0)
+  );
+
+  return {
+    orderCount,
+    salesAmount,
+    discountAmount,
+    receivedAmount,
+    averageOrderValue: orderCount > 0 ? roundCurrency(receivedAmount / orderCount) : 0
+  };
 }
 
 function buildSummary(

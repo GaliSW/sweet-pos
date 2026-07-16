@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import type { CreateInventoryMovementInput, InventoryMovementType } from "@/lib/backend/api-types";
 import { counters as fallbackCounters, products as fallbackProducts } from "@/lib/domain/sample-data";
+import { PurchaseModal } from "@/components/shared/PurchaseModal";
 import { COUNTER_CHANGED_EVENT, getSelectedCounterId } from "@/lib/shared/counter-preference";
 
 type ItemOption = {
@@ -39,6 +40,7 @@ type InventorySummary = {
 
 const movementOptions: Array<{ value: InventoryMovementType; label: string }> = [
   { value: "opening_count", label: "開班盤點" },
+  { value: "handover_count", label: "交班盤點" },
   { value: "closing_count", label: "下班盤點" },
   { value: "purchase", label: "進貨" },
   { value: "sampling", label: "試吃" },
@@ -46,7 +48,11 @@ const movementOptions: Array<{ value: InventoryMovementType; label: string }> = 
   { value: "adjustment", label: "調整" }
 ];
 
-const countTypes = new Set<InventoryMovementType>(["opening_count", "closing_count"]);
+const countTypes = new Set<InventoryMovementType>([
+  "opening_count",
+  "closing_count",
+  "handover_count"
+]);
 const noteRequiredTypes = new Set<InventoryMovementType>(["sampling", "waste", "adjustment"]);
 
 const fallbackItems: ItemOption[] = fallbackProducts
@@ -72,6 +78,7 @@ export function InventoryMovementForm() {
   const [status, setStatus] = useState("讀取庫存資料中...");
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [me, setMe] = useState<{ id: string; role: "staff" | "manager" } | null>(null);
 
   const requiresCount = countTypes.has(movementType);
@@ -267,7 +274,16 @@ export function InventoryMovementForm() {
   return (
     <section className="content-grid">
       <form className="panel data-card inventory-form" onSubmit={submitMovement}>
-        <h2>{editingId ? "編輯異動紀錄" : "新增異動"}</h2>
+        <div className="panel-header">
+          <h2>{editingId ? "編輯異動紀錄" : "新增異動"}</h2>
+          <button
+            className="secondary-action"
+            onClick={() => setPurchaseOpen(true)}
+            type="button"
+          >
+            進貨
+          </button>
+        </div>
         <label className="field">
           <span>櫃位（由上方「目前櫃位」決定）</span>
           <input disabled value={currentCounterName} />
@@ -318,7 +334,7 @@ export function InventoryMovementForm() {
               value={countedQuantity}
               onChange={(event) => setCountedQuantity(event.target.value)}
             />
-            <small>只有開班、下班盤點一定要填目前架上實際數量。</small>
+            <small>開班、交班與下班盤點一定要填目前架上實際數量。</small>
           </label>
         </div>
         <label className="field">
@@ -424,6 +440,19 @@ export function InventoryMovementForm() {
           </table>
         </div>
       </section>
+
+      {purchaseOpen ? (
+        <PurchaseModal
+          counterId={counterId}
+          counterName={currentCounterName}
+          onClose={() => setPurchaseOpen(false)}
+          onSaved={(message) => {
+            setPurchaseOpen(false);
+            setStatus(message);
+            void loadInventory();
+          }}
+        />
+      ) : null}
     </section>
   );
 }
