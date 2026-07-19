@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateBundleDiscount,
   calculateCommissionByTiers,
   calculateDailyCommission,
   calculateOrderTotals,
@@ -38,6 +39,87 @@ describe("calculateOrderTotals", () => {
     expect(belowMinimum.receivableAmount).toBe(980);
     expect(reachedMinimum.discountAmount).toBe(100);
     expect(reachedMinimum.receivableAmount).toBe(1180);
+  });
+
+  it("applies percentage discount on the bundle-discounted amount", () => {
+    const totals = calculateOrderTotals({
+      items: [{ unitPrice: 280, quantity: 2 }],
+      discount: { type: "percentage", value: 0.9 },
+      bundleDiscount: 60
+    });
+
+    expect(totals.salesAmount).toBe(560);
+    expect(totals.bundleDiscountAmount).toBe(60);
+    expect(totals.discountAmount).toBe(50);
+    expect(totals.receivableAmount).toBe(450);
+  });
+});
+
+describe("calculateBundleDiscount", () => {
+  const bundles = [
+    {
+      id: "bundle-1",
+      name: "袋裝任選",
+      productIds: ["p-280", "p-320"],
+      tiers: [
+        { quantity: 2, price: 500 },
+        { quantity: 4, price: 900 }
+      ]
+    }
+  ];
+
+  it("prefers the biggest tier and prices leftovers at unit price", () => {
+    // 5 件(320x2 + 280x3):4件900 一組(單價合計 1200 → 折 300),剩 1 件原價
+    const result = calculateBundleDiscount(
+      [
+        { productId: "p-320", unitPrice: 320, quantity: 2 },
+        { productId: "p-280", unitPrice: 280, quantity: 3 }
+      ],
+      bundles
+    );
+
+    expect(result.totalDiscount).toBe(300);
+    expect(result.applied[0].sets).toEqual([{ quantity: 4, price: 900, discount: 300 }]);
+  });
+
+  it("falls back to smaller tiers when the big tier cannot be formed", () => {
+    // 2 件 280:2件500(合計 560 → 折 60)
+    const result = calculateBundleDiscount(
+      [{ productId: "p-280", unitPrice: 280, quantity: 2 }],
+      bundles
+    );
+
+    expect(result.totalDiscount).toBe(60);
+  });
+
+  it("skips bundles that would cost more than unit prices", () => {
+    // 2 件 200 元商品:2件500 反而變貴 → 不套用
+    const result = calculateBundleDiscount(
+      [{ productId: "p-280", unitPrice: 200, quantity: 2 }],
+      [
+        {
+          id: "bundle-1",
+          name: "袋裝任選",
+          productIds: ["p-280"],
+          tiers: [{ quantity: 2, price: 500 }]
+        }
+      ]
+    );
+
+    expect(result.totalDiscount).toBe(0);
+    expect(result.applied).toEqual([]);
+  });
+
+  it("ignores products outside the bundle group", () => {
+    const result = calculateBundleDiscount(
+      [
+        { productId: "p-280", unitPrice: 280, quantity: 1 },
+        { productId: "other", unitPrice: 880, quantity: 1 }
+      ],
+      bundles
+    );
+
+    expect(result.totalDiscount).toBe(0);
   });
 });
 
@@ -165,8 +247,8 @@ describe("detectShiftConflicts", () => {
     ]);
   });
 
-  it("detects duplicate counter shift slots", () => {
-    const conflicts = detectShiftConflicts([
+  it("allows two staff on the same slot (shared shift) but flags a third", () => {
+    const sharedShift = [
       {
         id: "shift-1",
         staffId: "staff-1",
@@ -185,13 +267,28 @@ describe("detectShiftConflicts", () => {
         startsAt: "10:00",
         endsAt: "16:00"
       }
-    ]);
+    ];
 
-    expect(conflicts).toEqual([
+    expect(detectShiftConflicts(sharedShift)).toEqual([]);
+
+    const withThird = [
+      ...sharedShift,
+      {
+        id: "shift-3",
+        staffId: "staff-3",
+        counterId: "counter-a",
+        date: "2026-07-05",
+        shiftCode: "morning",
+        startsAt: "10:00",
+        endsAt: "16:00"
+      }
+    ];
+
+    expect(detectShiftConflicts(withThird)).toEqual([
       {
         type: "duplicate_counter_shift",
-        shiftIds: ["shift-1", "shift-2"],
-        message: "同一櫃位在 2026-07-05 的 morning 班別重複排班"
+        shiftIds: ["shift-1", "shift-3"],
+        message: "同一櫃位在 2026-07-05 的 morning 班別排超過 2 人"
       }
     ]);
   });

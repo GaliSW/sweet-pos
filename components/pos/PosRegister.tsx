@@ -9,7 +9,12 @@ import {
   type DiscountOption,
   type Product
 } from "@/lib/domain/sample-data";
-import { calculateOrderTotals, validateGiftBoxSelection } from "@/lib/domain/pos-rules";
+import {
+  calculateBundleDiscount,
+  calculateOrderTotals,
+  validateGiftBoxSelection,
+  type BundleDefinition
+} from "@/lib/domain/pos-rules";
 import { COUNTER_CHANGED_EVENT, getSelectedCounterId } from "@/lib/shared/counter-preference";
 
 type Category = "popular" | "bag" | "gift_box";
@@ -51,6 +56,7 @@ export function PosRegister() {
   const [flavors, setFlavors] = useState<FlavorOption[]>(
     fallbackFlavors.map((name) => ({ id: null, name, spec: "6入/袋" }))
   );
+  const [bundles, setBundles] = useState<BundleDefinition[]>([]);
   const [stockByKey, setStockByKey] = useState<Record<string, number> | null>(null);
   const [counters, setCounters] = useState(
     fallbackCounters.map((counter) => ({ id: counter.id, name: counter.name }))
@@ -156,6 +162,7 @@ export function PosRegister() {
       setProducts(mapped.products);
       setDiscounts(mapped.discounts);
       setFlavors(mapped.flavors);
+      setBundles(mapped.bundles);
       setCounters(mapped.counters);
       setCounterId((current) =>
         mapped.counters.some((counter) => counter.id === current)
@@ -170,12 +177,31 @@ export function PosRegister() {
   const currentCounterName =
     counters.find((counter) => counter.id === counterId)?.name ?? counters[0]?.name ?? "";
 
+  // 自選禮盒的可選口味:後台有勾選就只顯示勾選的,沒勾選 = 全部口味可選
+  const allowedFlavorIds = pendingGift?.giftRule?.allowedFlavorIds ?? [];
+  const modalFlavors =
+    allowedFlavorIds.length > 0
+      ? flavors.filter((flavor) => flavor.id != null && allowedFlavorIds.includes(flavor.id))
+      : flavors;
+
   const visibleProducts = products.filter((product) => {
     if (category === "popular") return product.popular;
     return product.category === category;
   });
 
   const selectedDiscount = discounts.find((discount) => discount.id === selectedDiscountId);
+  const bundleResult = useMemo(
+    () =>
+      calculateBundleDiscount(
+        cart.map((item) => ({
+          productId: item.product.id,
+          unitPrice: item.product.price,
+          quantity: item.quantity
+        })),
+        bundles
+      ),
+    [cart, bundles]
+  );
   const totals = useMemo(
     () =>
       calculateOrderTotals({
@@ -183,9 +209,10 @@ export function PosRegister() {
           unitPrice: item.product.price,
           quantity: item.quantity
         })),
-        discount: toDomainDiscount(selectedDiscount)
+        discount: toDomainDiscount(selectedDiscount),
+        bundleDiscount: bundleResult.totalDiscount
       }),
-    [cart, selectedDiscount]
+    [cart, selectedDiscount, bundleResult]
   );
 
   function flavorStockKey(flavor: { flavorId: string | null; flavorName: string }) {
@@ -673,6 +700,23 @@ export function PosRegister() {
                 <span>銷售金額</span>
                 <strong>${totals.salesAmount}</strong>
               </div>
+              {totals.bundleDiscountAmount > 0 ? (
+                <div className="total-line">
+                  <span>
+                    組合折抵（
+                    {bundleResult.applied
+                      .map(
+                        (bundle) =>
+                          `${bundle.name} ${bundle.sets
+                            .map((set) => `${set.quantity}件$${set.price}`)
+                            .join("+")}`
+                      )
+                      .join("、")}
+                    ）
+                  </span>
+                  <strong>-${totals.bundleDiscountAmount}</strong>
+                </div>
+              ) : null}
               <div className="total-line">
                 <span>折扣金額</span>
                 <strong>-${totals.discountAmount}</strong>
@@ -722,7 +766,7 @@ export function PosRegister() {
               <span className="pill">{selectedFlavors.length} 已選</span>
             </div>
             <div className="flavor-grid">
-              {flavors.map((flavor) => {
+              {modalFlavors.map((flavor) => {
                 const stock = stockByKey
                   ? stockByKey[flavor.id ? `flavor:${flavor.id}` : `flavorName:${flavor.name}`] ?? 0
                   : null;
@@ -795,6 +839,13 @@ type SupabaseCatalog = {
     includes_scallion_cracker: boolean;
   }>;
   fixedFlavors?: Array<{ product_id: string; quantity: number; flavors: unknown }>;
+  allowedFlavors?: Array<{ product_id: string; flavor_id: string }>;
+  bundles?: Array<{
+    id: string;
+    name: string;
+    productIds: string[];
+    tiers: Array<{ quantity: number; price: number }>;
+  }>;
   flavors: Array<{ id: string; name: string; spec?: string }>;
   staff: Array<{ id: string; display_name?: string; name?: string }>;
   discounts: Array<{
@@ -838,6 +889,14 @@ function mapSupabaseCatalog(data: SupabaseCatalog) {
     fixedItemsByProduct.set(row.product_id, items);
   }
 
+  const allowedByProduct = new Map<string, string[]>();
+
+  for (const row of data.allowedFlavors ?? []) {
+    const list = allowedByProduct.get(row.product_id) ?? [];
+    list.push(row.flavor_id);
+    allowedByProduct.set(row.product_id, list);
+  }
+
   const products: Product[] = data.products.map((product) => {
     const rule = rules.get(product.id);
 
@@ -853,6 +912,7 @@ function mapSupabaseCatalog(data: SupabaseCatalog) {
             mode: rule.selection_mode,
             requiredFlavorCount: rule.required_flavor_count,
             includesScallionCracker: rule.includes_scallion_cracker,
+            allowedFlavorIds: allowedByProduct.get(product.id) ?? [],
             fixedFlavors: fixedNamesByProduct.get(product.id),
             fixedFlavorItems: fixedItemsByProduct.get(product.id)
           }
@@ -875,6 +935,7 @@ function mapSupabaseCatalog(data: SupabaseCatalog) {
   return {
     products,
     discounts,
+    bundles: data.bundles ?? [],
     flavors: data.flavors.map((flavor) => ({
       id: flavor.id,
       name: flavor.name,

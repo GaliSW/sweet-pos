@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   let ordersQuery = supabase
     .from("orders")
     .select(
-      "id, created_at, seller_id, seller2_id, counter_id, discount_id, sales_amount, discount_amount, received_amount, seller:profiles!orders_seller_id_fkey(display_name), seller2:profiles!orders_seller2_id_fkey(display_name), counters(name)"
+      "id, created_at, seller_id, seller2_id, counter_id, discount_id, sales_amount, bundle_discount_amount, discount_amount, received_amount, seller:profiles!orders_seller_id_fkey(display_name), seller2:profiles!orders_seller2_id_fkey(display_name), counters(name)"
     )
     .eq("status", "completed")
     .gte("created_at", taipeiDayStart(from))
@@ -79,12 +79,13 @@ export async function GET(request: Request) {
     targetsQuery = targetsQuery.eq("counter_id", counterId);
   }
 
-  const [ordersResult, targetsResult, tierSets] = await Promise.all([
+  const [ordersResult, targetsResult, tierSets, modesResult] = await Promise.all([
     ordersQuery,
     targetsQuery,
-    fetchCommissionTierSets(supabase)
+    fetchCommissionTierSets(supabase),
+    supabase.from("profiles").select("id, commission_mode")
   ]);
-  const error = ordersResult.error ?? targetsResult.error;
+  const error = ordersResult.error ?? targetsResult.error ?? modesResult.error;
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -104,9 +105,17 @@ export async function GET(request: Request) {
     counterName: relationName(order.counters),
     discountId: order.discount_id as string | null,
     salesAmount: Number(order.sales_amount),
-    discountAmount: Number(order.discount_amount),
+    // 折讓 = 組合價折抵 + 訂單折扣
+    discountAmount: Number(order.discount_amount) + Number(order.bundle_discount_amount ?? 0),
     receivedAmount: Number(order.received_amount)
   }));
+
+  const commissionModeById = new Map(
+    (modesResult.data ?? []).map((profile) => [
+      profile.id as string,
+      (profile.commission_mode as "daily" | "monthly") ?? "daily"
+    ])
+  );
 
   const daily = new Map<string, DailyPerformanceRow>();
   const monthly = new Map<string, MonthlyPerformanceRow>();
@@ -178,9 +187,16 @@ export async function GET(request: Request) {
     );
   }
 
-  // 抽成一日一算:以「當日 × 個人」合計(共班已各半)套該員工的級距(個人覆寫優先),
-  // 再按各櫃位列的實收比例分攤,避免跨列或跨日累積業績造成級距誤判。
+  // 抽成:日結員工「當日 × 個人」合計(共班已各半)套級距後按列分攤;
+  // 月結員工(commission_mode = monthly)以月總實收套級距,每日列只標示「月結」。
   for (const row of daily.values()) {
+    row.commissionMode = commissionModeById.get(row.sellerId) ?? "daily";
+
+    if (row.commissionMode === "monthly") {
+      row.commission = 0;
+      continue;
+    }
+
     const dayTotal = sellerDayReceived.get(`${row.date}|${row.sellerId}`) ?? 0;
     const dayCommission = calculateCommissionByTiers(dayTotal, resolveTiers(tierSets, row.sellerId));
 
@@ -190,6 +206,9 @@ export async function GET(request: Request) {
 
   for (const [key, received] of sellerDayReceived) {
     const sellerId = key.split("|")[1];
+
+    if ((commissionModeById.get(sellerId) ?? "daily") === "monthly") continue;
+
     const month = key.slice(0, 7);
     const monthlyRow = monthly.get(`${month}|${sellerId}`);
 
@@ -197,6 +216,17 @@ export async function GET(request: Request) {
       monthlyRow.commission += calculateCommissionByTiers(
         received,
         resolveTiers(tierSets, sellerId)
+      );
+    }
+  }
+
+  for (const row of monthly.values()) {
+    row.commissionMode = commissionModeById.get(row.sellerId) ?? "daily";
+
+    if (row.commissionMode === "monthly") {
+      row.commission = calculateCommissionByTiers(
+        row.receivedAmount,
+        resolveTiers(tierSets, row.sellerId)
       );
     }
   }

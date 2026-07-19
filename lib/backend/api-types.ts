@@ -91,6 +91,8 @@ export type ApplyPreviousScheduleInput = {
   month: string;
 };
 
+export type CommissionMode = "daily" | "monthly";
+
 export type DailyPerformanceRow = {
   date: string;
   sellerId: string;
@@ -102,6 +104,8 @@ export type DailyPerformanceRow = {
   discountAmount: number;
   receivedAmount: number;
   commission: number;
+  // 月結員工的每日列不顯示金額,前端顯示「月結」
+  commissionMode?: CommissionMode;
 };
 
 export type MonthlyPerformanceRow = {
@@ -113,6 +117,7 @@ export type MonthlyPerformanceRow = {
   discountAmount: number;
   receivedAmount: number;
   commission: number;
+  commissionMode?: CommissionMode;
 };
 
 export type ReportSummary = {
@@ -155,7 +160,17 @@ export type UpsertProductInput = {
     selectionMode: "select" | "fixed";
     requiredFlavorCount?: number;
     includesScallionCracker?: boolean;
+    // 自選禮盒可選口味(空陣列或未帶 = 全部口味可選)
+    allowedFlavorIds?: string[];
   } | null;
+};
+
+export type UpsertBundleInput = {
+  id?: string;
+  name: string;
+  isActive?: boolean;
+  productIds: string[];
+  tiers: Array<{ quantity: number; price: number }>;
 };
 
 export type UpsertDiscountInput = {

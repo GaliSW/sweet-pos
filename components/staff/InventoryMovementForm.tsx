@@ -79,6 +79,9 @@ export function InventoryMovementForm() {
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [recordsOpen, setRecordsOpen] = useState(false);
+  const [recordSearch, setRecordSearch] = useState("");
+  const [recordType, setRecordType] = useState<"all" | InventoryMovementType>("all");
   const [me, setMe] = useState<{ id: string; role: "staff" | "manager" } | null>(null);
 
   const requiresCount = countTypes.has(movementType);
@@ -107,7 +110,19 @@ export function InventoryMovementForm() {
     if (requiresCount) setQuantity("0");
   }, [requiresCount]);
 
-  const latestMovements = useMemo(() => movements.slice(0, 12), [movements]);
+  const filteredMovements = useMemo(() => {
+    const keyword = recordSearch.trim().toLowerCase();
+
+    return movements.filter((movement) => {
+      if (recordType !== "all" && movement.movementType !== recordType) return false;
+      if (!keyword) return true;
+
+      return [movement.itemName, movement.movementLabel, movement.note ?? "", movement.createdByName]
+        .join(" ")
+        .toLowerCase()
+        .includes(keyword);
+    });
+  }, [movements, recordSearch, recordType]);
   const currentCounterName =
     counters.find((counter) => counter.id === counterId)?.name ?? counters[0]?.name ?? "";
 
@@ -175,6 +190,7 @@ export function InventoryMovementForm() {
   }
 
   function startEdit(movement: InventoryMovement) {
+    setRecordsOpen(false); // 關閉紀錄彈窗,回到表單編輯
     setEditingId(movement.id);
     setMovementType(movement.movementType);
     setItemKey(movement.itemKey);
@@ -276,13 +292,22 @@ export function InventoryMovementForm() {
       <form className="panel data-card inventory-form" onSubmit={submitMovement}>
         <div className="panel-header">
           <h2>{editingId ? "編輯異動紀錄" : "新增異動"}</h2>
-          <button
-            className="secondary-action"
-            onClick={() => setPurchaseOpen(true)}
-            type="button"
-          >
-            進貨
-          </button>
+          <div className="toolbar">
+            <button
+              className="secondary-action"
+              onClick={() => setRecordsOpen(true)}
+              type="button"
+            >
+              最近紀錄
+            </button>
+            <button
+              className="secondary-action"
+              onClick={() => setPurchaseOpen(true)}
+              type="button"
+            >
+              進貨
+            </button>
+          </div>
         </div>
         <label className="field">
           <span>櫃位（由上方「目前櫃位」決定）</span>
@@ -359,61 +384,6 @@ export function InventoryMovementForm() {
       </form>
 
       <section className="panel data-card">
-        <h2>{currentCounterName} 最近紀錄</h2>
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>時間</th>
-                <th>類型</th>
-                <th>品項</th>
-                <th>數量</th>
-                <th>備註</th>
-                <th>建立 / 更新</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {latestMovements.map((movement) => (
-                <tr key={movement.id}>
-                  <td>{formatTime(movement.createdAt)}</td>
-                  <td>{movement.movementLabel}</td>
-                  <td>{movement.itemName}</td>
-                  <td>{movement.countedQuantity ?? movement.quantity}</td>
-                  <td>{movement.note ?? "-"}</td>
-                  <td>
-                    {movement.createdByName}
-                    {movement.updatedByName ? `（${movement.updatedByName} 更新）` : ""}
-                  </td>
-                  <td>
-                    {canEdit(movement) ? (
-                      <div className="toolbar">
-                        <button
-                          className="secondary-action"
-                          onClick={() => startEdit(movement)}
-                          type="button"
-                        >
-                          編輯
-                        </button>
-                        <button
-                          className="secondary-action"
-                          disabled={submitting}
-                          onClick={() => deleteMovement(movement)}
-                          type="button"
-                        >
-                          刪除
-                        </button>
-                      </div>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="panel data-card inventory-summary-panel">
         <h2>庫存摘要</h2>
         <div className="table-scroll">
           <table>
@@ -440,6 +410,135 @@ export function InventoryMovementForm() {
           </table>
         </div>
       </section>
+
+      {recordsOpen ? (
+        <div className="modal-backdrop" onClick={() => setRecordsOpen(false)} role="presentation">
+          <section
+            aria-label={`${currentCounterName} 庫存異動紀錄`}
+            className="modal order-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="panel-header">
+              <div>
+                <h2>{currentCounterName} 異動紀錄</h2>
+                <p>共 {filteredMovements.length} 筆</p>
+              </div>
+              <button
+                aria-label="關閉紀錄"
+                className="icon-btn"
+                onClick={() => setRecordsOpen(false)}
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  fill="none"
+                  height="18"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeWidth="2.2"
+                  viewBox="0 0 24 24"
+                  width="18"
+                >
+                  <path d="M5 5l14 14M19 5L5 19" />
+                </svg>
+              </button>
+            </div>
+            <div className="order-modal-body">
+              <div className="toolbar">
+                <label className="field compact">
+                  <span>搜尋</span>
+                  <input
+                    placeholder="品項、備註、人員"
+                    value={recordSearch}
+                    onChange={(event) => setRecordSearch(event.target.value)}
+                  />
+                </label>
+                <label className="field compact">
+                  <span>類型</span>
+                  <select
+                    value={recordType}
+                    onChange={(event) =>
+                      setRecordType(event.target.value as "all" | InventoryMovementType)
+                    }
+                  >
+                    <option value="all">全部</option>
+                    {movementOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>時間</th>
+                      <th>類型</th>
+                      <th>品項</th>
+                      <th>數量</th>
+                      <th>備註</th>
+                      <th>建立 / 更新</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredMovements.map((movement) => (
+                      <tr key={movement.id}>
+                        <td>{formatTime(movement.createdAt)}</td>
+                        <td>{movement.movementLabel}</td>
+                        <td>{movement.itemName}</td>
+                        <td>{movement.countedQuantity ?? movement.quantity}</td>
+                        <td>{movement.note ?? "-"}</td>
+                        <td>
+                          {movement.createdByName}
+                          {movement.updatedByName ? `（${movement.updatedByName} 更新）` : ""}
+                        </td>
+                        <td>
+                          {canEdit(movement) ? (
+                            <div className="toolbar">
+                              <button
+                                className="secondary-action"
+                                onClick={() => startEdit(movement)}
+                                type="button"
+                              >
+                                編輯
+                              </button>
+                              <button
+                                className="secondary-action"
+                                disabled={submitting}
+                                onClick={() => deleteMovement(movement)}
+                                type="button"
+                              >
+                                刪除
+                              </button>
+                            </div>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredMovements.length === 0 ? (
+                      <tr>
+                        <td colSpan={7}>沒有符合條件的紀錄</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button
+                className="secondary-action"
+                onClick={() => setRecordsOpen(false)}
+                type="button"
+              >
+                關閉
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {purchaseOpen ? (
         <PurchaseModal

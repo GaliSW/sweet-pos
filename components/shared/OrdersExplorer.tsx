@@ -56,6 +56,7 @@ type OrderRow = {
   paymentMethod: string;
   paymentLabel: string;
   salesAmount: number;
+  bundleDiscountAmount: number;
   discountAmount: number;
   receivedAmount: number;
   status: "completed" | "voided";
@@ -531,6 +532,12 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
                 <span>銷售金額</span>
                 <strong>{formatCurrency(detailOrder.salesAmount)}</strong>
               </div>
+              {detailOrder.bundleDiscountAmount > 0 ? (
+                <div className="total-line">
+                  <span>組合折抵</span>
+                  <strong>-{formatCurrency(detailOrder.bundleDiscountAmount)}</strong>
+                </div>
+              ) : null}
               <div className="total-line">
                 <span>折扣金額</span>
                 <strong>-{formatCurrency(detailOrder.discountAmount)}</strong>

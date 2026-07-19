@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { CreateOrderInput } from "@/lib/backend/api-types";
 import { requireRole } from "@/lib/auth/guards";
+import { computeOrderBundleDiscount } from "@/lib/backend/bundles";
 import { getOnDutySellers } from "@/lib/backend/on-duty";
 import {
   nextDay,
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from("orders")
     .select(
-      "id, order_no, created_at, counter_id, seller_id, seller2_id, cashier_id, discount_id, payment_method, sales_amount, discount_amount, receivable_amount, received_amount, status, void_reason, counters(name), seller:profiles!orders_seller_id_fkey(display_name), seller2:profiles!orders_seller2_id_fkey(display_name), cashier:profiles!orders_cashier_id_fkey(display_name), voider:profiles!orders_voided_by_fkey(display_name), editor:profiles!orders_edited_by_fkey(display_name)"
+      "id, order_no, created_at, counter_id, seller_id, seller2_id, cashier_id, discount_id, payment_method, sales_amount, bundle_discount_amount, discount_amount, receivable_amount, received_amount, status, void_reason, counters(name), seller:profiles!orders_seller_id_fkey(display_name), seller2:profiles!orders_seller2_id_fkey(display_name), cashier:profiles!orders_cashier_id_fkey(display_name), voider:profiles!orders_voided_by_fkey(display_name), editor:profiles!orders_edited_by_fkey(display_name)"
     )
     .gte("created_at", taipeiDayStart(from))
     .lt("created_at", taipeiDayStart(nextDay(to)))
@@ -161,6 +162,7 @@ export async function GET(request: Request) {
         paymentMethod: order.payment_method,
         paymentLabel: paymentLabels[order.payment_method as string] ?? order.payment_method,
         salesAmount: Number(order.sales_amount),
+        bundleDiscountAmount: Number(order.bundle_discount_amount ?? 0),
         discountAmount: Number(order.discount_amount),
         receivedAmount: Number(order.received_amount),
         status: order.status,
@@ -228,6 +230,10 @@ export async function PATCH(request: Request) {
     const supabase = createSupabaseAdminClient();
     const editedBy =
       guard.profile?.id ?? process.env.DEMO_MANAGER_ID ?? "00000000-0000-4000-8000-000000000004";
+    const bundleDiscount = await computeOrderBundleDiscount(
+      supabase,
+      input.items.map((item) => ({ productId: item.productId, quantity: item.quantity }))
+    );
 
     const { error } = await supabase.rpc("update_pos_order", {
       p_order_id: input.orderId,
@@ -237,7 +243,8 @@ export async function PATCH(request: Request) {
       p_payment_method: input.paymentMethod ?? "cash",
       p_items: input.items,
       p_edited_by: editedBy,
-      p_created_at: input.createdAt ?? null
+      p_created_at: input.createdAt ?? null,
+      p_bundle_discount: bundleDiscount
     });
 
     if (error) {
@@ -348,6 +355,10 @@ export async function POST(request: Request) {
     guard.profile?.id ?? process.env.DEMO_CASHIER_ID ?? defaultCashierId;
   const sellerId = onDuty[0]?.id ?? fallbackSellerId;
   const seller2Id = onDuty[1]?.id ?? null;
+  const bundleDiscount = await computeOrderBundleDiscount(
+    supabase,
+    input.items.map((item) => ({ productId: item.productId, quantity: item.quantity }))
+  );
 
   const { data, error } = await supabase.rpc("create_pos_order", {
     p_counter_id: input.counterId,
@@ -356,7 +367,8 @@ export async function POST(request: Request) {
     p_cashier_id: sellerId,
     p_discount_id: input.discountId ?? null,
     p_payment_method: input.paymentMethod,
-    p_items: input.items
+    p_items: input.items,
+    p_bundle_discount: bundleDiscount
   });
 
   if (error) {

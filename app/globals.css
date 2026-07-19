@@ -1189,8 +1189,54 @@ select:focus-visible {
   align-items: start;
 }
 
-.inventory-summary-panel {
-  grid-column: 1 / -1;
+/* 全寬堆疊區塊:表格卡片與表單卡片上下排列,避免左右高度差造成大空洞 */
+.stack-grid {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}
+
+/* 勾選晶片(可選口味 / 組合價適用商品):覆蓋 .field input 的全寬樣式 */
+.check-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.check-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0 14px;
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  color: var(--accent-strong);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.check-chip:hover {
+  border-color: var(--accent-bright);
+}
+
+.check-chip:has(input:checked) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.field .check-chip input[type="checkbox"],
+.check-chip input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent-strong);
 }
 
 .inventory-form {

@@ -157,7 +157,7 @@ export function ReportsView() {
         銷售金額: row.salesAmount,
         折扣金額: row.discountAmount,
         實收金額: row.receivedAmount,
-        抽成: row.commission
+        抽成: row.commissionMode === "monthly" ? "月結" : row.commission
       }))
     );
 
@@ -346,7 +346,13 @@ export function ReportsView() {
                   <td>{formatCurrency(row.salesAmount)}</td>
                   <td>{formatCurrency(row.discountAmount)}</td>
                   <td>{formatCurrency(row.receivedAmount)}</td>
-                  <td>{formatCurrency(row.commission)}</td>
+                  <td>
+                    {row.commissionMode === "monthly" ? (
+                      <span className="status">月結</span>
+                    ) : (
+                      formatCurrency(row.commission)
+                    )}
+                  </td>
                 </tr>
               ))}
               {report && visibleDaily.length === 0 ? (

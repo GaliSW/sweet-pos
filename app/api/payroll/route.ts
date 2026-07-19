@@ -59,7 +59,10 @@ export async function GET(request: Request) {
   const [shiftsResult, ordersResult, profilesResult, tierSets] = await Promise.all([
     shiftsQuery,
     ordersQuery,
-    supabase.from("profiles").select("id, display_name, hourly_wage").eq("role", "staff"),
+    supabase
+      .from("profiles")
+      .select("id, display_name, hourly_wage, commission_mode")
+      .eq("role", "staff"),
     fetchCommissionTierSets(supabase)
   ]);
 
@@ -72,7 +75,11 @@ export async function GET(request: Request) {
   const profileById = new Map(
     (profilesResult.data ?? []).map((profile) => [
       profile.id as string,
-      { name: profile.display_name as string, hourlyWage: Number(profile.hourly_wage) }
+      {
+        name: profile.display_name as string,
+        hourlyWage: Number(profile.hourly_wage),
+        commissionMode: (profile.commission_mode as "daily" | "monthly") ?? "daily"
+      }
     ])
   );
 
@@ -100,12 +107,16 @@ export async function GET(request: Request) {
   }
 
   for (const shift of shiftsResult.data ?? []) {
+    // 店長也能排班,但薪資試算只列員工
+    if (!profileById.has(shift.staff_id as string)) continue;
+
     const row = rowFor(shift.staff_id as string);
     row.shiftCount += 1;
     row.scheduledHours += shiftDurationHours(shift.starts_at, shift.ends_at);
   }
 
   const sellerDayReceived = new Map<string, number>();
+  const sellerMonthReceived = new Map<string, number>();
 
   for (const order of ordersResult.data ?? []) {
     // 共班訂單掛兩位銷售,實收金額均分計入各自的日業績
@@ -116,13 +127,26 @@ export async function GET(request: Request) {
     for (const sellerId of sellerIds) {
       const key = `${date}|${sellerId}`;
       sellerDayReceived.set(key, (sellerDayReceived.get(key) ?? 0) + share);
+      sellerMonthReceived.set(sellerId, (sellerMonthReceived.get(sellerId) ?? 0) + share);
     }
   }
 
+  // 日結:逐日套級距加總;月結:月總實收套級距一次計算
   for (const [key, received] of sellerDayReceived) {
     const staffId = key.split("|")[1];
+    const profile = profileById.get(staffId);
+
+    if (!profile || profile.commissionMode === "monthly") continue;
+
     const row = rowFor(staffId);
     row.commission += calculateCommissionByTiers(received, resolveTiers(tierSets, staffId));
+  }
+
+  for (const [staffId, received] of sellerMonthReceived) {
+    if (profileById.get(staffId)?.commissionMode !== "monthly") continue;
+
+    const row = rowFor(staffId);
+    row.commission = calculateCommissionByTiers(received, resolveTiers(tierSets, staffId));
   }
 
   const payroll = Array.from(rows.values())

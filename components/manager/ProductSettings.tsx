@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { UpsertDiscountInput, UpsertProductInput } from "@/lib/backend/api-types";
+import type {
+  UpsertBundleInput,
+  UpsertDiscountInput,
+  UpsertProductInput
+} from "@/lib/backend/api-types";
 
 type ProductRow = {
   id: string;
@@ -15,7 +19,23 @@ type ProductRow = {
     selectionMode: "select" | "fixed";
     requiredFlavorCount: number;
     includesScallionCracker: boolean;
+    allowedFlavorIds?: string[];
   } | null;
+};
+
+type FlavorRow = {
+  id: string;
+  name: string;
+  spec: string;
+  isActive: boolean;
+};
+
+type BundleRow = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  productIds: string[];
+  tiers: Array<{ quantity: number; price: number }>;
 };
 
 type DiscountRow = {
@@ -45,11 +65,29 @@ const emptyDiscount: UpsertDiscountInput = {
   isActive: true
 };
 
+const emptyFlavor = { name: "", spec: "6入/袋", isActive: true };
+
+const emptyBundle: UpsertBundleInput = {
+  name: "",
+  isActive: true,
+  productIds: [],
+  tiers: [{ quantity: 2, price: 0 }]
+};
+
 export function ProductSettings() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [discounts, setDiscounts] = useState<DiscountRow[]>([]);
+  const [flavors, setFlavors] = useState<FlavorRow[]>([]);
+  const [bundles, setBundles] = useState<BundleRow[]>([]);
   const [productForm, setProductForm] = useState<UpsertProductInput>(emptyProduct);
   const [discountForm, setDiscountForm] = useState<UpsertDiscountInput>(emptyDiscount);
+  const [flavorForm, setFlavorForm] = useState<{
+    id?: string;
+    name: string;
+    spec: string;
+    isActive: boolean;
+  }>(emptyFlavor);
+  const [bundleForm, setBundleForm] = useState<UpsertBundleInput>(emptyBundle);
   const [status, setStatus] = useState("讀取商品資料中...");
   const [saving, setSaving] = useState(false);
 
@@ -58,12 +96,12 @@ export function ProductSettings() {
   }, []);
 
   async function loadData() {
-    const [productsResponse, discountsResponse] = await Promise.all([
-      fetch("/api/products"),
-      fetch("/api/discounts")
+    const [productsResult, discountsResult, flavorsResult, bundlesResult] = await Promise.all([
+      fetch("/api/products").then((response) => response.json()),
+      fetch("/api/discounts").then((response) => response.json()),
+      fetch("/api/flavors").then((response) => response.json()),
+      fetch("/api/bundles").then((response) => response.json())
     ]);
-    const productsResult = await productsResponse.json();
-    const discountsResult = await discountsResponse.json();
 
     if (!productsResult.ok || !discountsResult.ok) {
       setStatus(productsResult.error ?? discountsResult.error);
@@ -72,6 +110,8 @@ export function ProductSettings() {
 
     setProducts(productsResult.data.products);
     setDiscounts(discountsResult.data.discounts);
+    setFlavors(flavorsResult.ok ? flavorsResult.data.flavors ?? [] : []);
+    setBundles(bundlesResult.ok ? bundlesResult.data.bundles ?? [] : []);
     setStatus(productsResult.data.source === "supabase" ? "已連線本地資料庫" : "Demo 模式");
   }
 
@@ -88,7 +128,8 @@ export function ProductSettings() {
         ? {
             selectionMode: product.giftRule.selectionMode,
             requiredFlavorCount: product.giftRule.requiredFlavorCount,
-            includesScallionCracker: product.giftRule.includesScallionCracker
+            includesScallionCracker: product.giftRule.includesScallionCracker,
+            allowedFlavorIds: product.giftRule.allowedFlavorIds ?? []
           }
         : null
     });
@@ -185,9 +226,134 @@ export function ProductSettings() {
         selectionMode: current.giftRule?.selectionMode ?? "select",
         requiredFlavorCount: current.giftRule?.requiredFlavorCount ?? 3,
         includesScallionCracker: current.giftRule?.includesScallionCracker ?? false,
+        allowedFlavorIds: current.giftRule?.allowedFlavorIds ?? [],
         ...partial
       }
     }));
+  }
+
+  function toggleAllowedFlavor(flavorId: string) {
+    const current = productForm.giftRule?.allowedFlavorIds ?? [];
+    updateGiftRule({
+      allowedFlavorIds: current.includes(flavorId)
+        ? current.filter((id) => id !== flavorId)
+        : [...current, flavorId]
+    });
+  }
+
+  async function saveFlavor() {
+    if (!flavorForm.name.trim()) {
+      setStatus("請填口味名稱");
+      return;
+    }
+
+    setSaving(true);
+    setStatus("儲存口味中...");
+
+    const response = await fetch("/api/flavors", {
+      method: flavorForm.id ? "PATCH" : "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(flavorForm)
+    });
+    const result = await response.json();
+
+    setSaving(false);
+
+    if (!result.ok) {
+      setStatus(result.error);
+      return;
+    }
+
+    setStatus(flavorForm.id ? "口味已更新" : "口味已新增");
+    setFlavorForm(emptyFlavor);
+    await loadData();
+  }
+
+  async function deleteFlavor(flavor: FlavorRow) {
+    if (!window.confirm(`確定刪除口味「${flavor.name}」？已有紀錄的口味會改為停用。`)) return;
+
+    setSaving(true);
+    const response = await fetch("/api/flavors", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: flavor.id })
+    });
+    const result = await response.json();
+    setSaving(false);
+
+    if (!result.ok) {
+      setStatus(result.error);
+      return;
+    }
+
+    setStatus(
+      result.data.mode === "deactivated" ? result.data.message : `口味「${flavor.name}」已刪除`
+    );
+    if (flavorForm.id === flavor.id) setFlavorForm(emptyFlavor);
+    await loadData();
+  }
+
+  function updateBundleTier(index: number, partial: Partial<{ quantity: number; price: number }>) {
+    setBundleForm((current) => ({
+      ...current,
+      tiers: current.tiers.map((tier, tierIndex) =>
+        tierIndex === index ? { ...tier, ...partial } : tier
+      )
+    }));
+  }
+
+  function toggleBundleProduct(productId: string) {
+    setBundleForm((current) => ({
+      ...current,
+      productIds: current.productIds.includes(productId)
+        ? current.productIds.filter((id) => id !== productId)
+        : [...current.productIds, productId]
+    }));
+  }
+
+  async function saveBundle() {
+    setSaving(true);
+    setStatus("儲存組合價中...");
+
+    const response = await fetch("/api/bundles", {
+      method: bundleForm.id ? "PATCH" : "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(bundleForm)
+    });
+    const result = await response.json();
+
+    setSaving(false);
+
+    if (!result.ok) {
+      setStatus(result.error);
+      return;
+    }
+
+    setStatus(bundleForm.id ? "組合價已更新" : "組合價已新增");
+    setBundleForm(emptyBundle);
+    await loadData();
+  }
+
+  async function deleteBundle(bundle: BundleRow) {
+    if (!window.confirm(`確定刪除組合價「${bundle.name}」？`)) return;
+
+    setSaving(true);
+    const response = await fetch("/api/bundles", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: bundle.id })
+    });
+    const result = await response.json();
+    setSaving(false);
+
+    if (!result.ok) {
+      setStatus(result.error);
+      return;
+    }
+
+    setStatus(`組合價「${bundle.name}」已刪除`);
+    if (bundleForm.id === bundle.id) setBundleForm(emptyBundle);
+    await loadData();
   }
 
   return (
@@ -372,6 +538,32 @@ export function ProductSettings() {
             </div>
           ) : null}
 
+          {productForm.category === "gift_box" &&
+          productForm.giftRule?.selectionMode === "select" ? (
+            <div className="field">
+              <span>可選口味（都不勾 = 全部口味可選）</span>
+              <div className="check-chip-list">
+                {flavors
+                  .filter((flavor) => flavor.isActive)
+                  .map((flavor) => {
+                    const checked =
+                      productForm.giftRule?.allowedFlavorIds?.includes(flavor.id) ?? false;
+
+                    return (
+                      <label key={flavor.id} className="check-chip">
+                        <input
+                          checked={checked}
+                          onChange={() => toggleAllowedFlavor(flavor.id)}
+                          type="checkbox"
+                        />{" "}
+                        {flavor.name}
+                      </label>
+                    );
+                  })}
+              </div>
+            </div>
+          ) : null}
+
           <div className="form-actions">
             {productForm.id ? (
               <button
@@ -389,7 +581,7 @@ export function ProductSettings() {
         </article>
       </section>
 
-      <section className="content-grid">
+      <section className="stack-grid">
         <article className="panel data-card">
           <h2>折扣</h2>
           <div className="table-scroll">
@@ -508,6 +700,291 @@ export function ProductSettings() {
             ) : null}
             <button className="primary-action slim" disabled={saving} onClick={saveDiscount} type="button">
               {discountForm.id ? "更新折扣" : "新增折扣"}
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <section className="stack-grid">
+        <article className="panel data-card">
+          <h2>禮盒口味管理</h2>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>口味</th>
+                  <th>規格</th>
+                  <th>狀態</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {flavors.map((flavor) => (
+                  <tr key={flavor.id}>
+                    <td>{flavor.name}</td>
+                    <td>{flavor.spec}</td>
+                    <td>{flavor.isActive ? "啟用" : "停用"}</td>
+                    <td>
+                      <div className="toolbar">
+                        <button
+                          className="secondary-action"
+                          onClick={() =>
+                            setFlavorForm({
+                              id: flavor.id,
+                              name: flavor.name,
+                              spec: flavor.spec,
+                              isActive: flavor.isActive
+                            })
+                          }
+                          type="button"
+                        >
+                          編輯
+                        </button>
+                        <button
+                          className="secondary-action"
+                          disabled={saving}
+                          onClick={() => deleteFlavor(flavor)}
+                          type="button"
+                        >
+                          刪除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {flavors.length === 0 ? (
+                  <tr>
+                    <td colSpan={4}>尚未建立口味</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article className="panel data-card form-stack">
+          <h2>{flavorForm.id ? "編輯口味" : "新增口味"}</h2>
+          <div className="field-row">
+            <label className="field">
+              <span>口味名稱</span>
+              <input
+                value={flavorForm.name}
+                onChange={(event) => setFlavorForm({ ...flavorForm, name: event.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>規格</span>
+              <input
+                value={flavorForm.spec}
+                onChange={(event) => setFlavorForm({ ...flavorForm, spec: event.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>狀態</span>
+              <select
+                value={flavorForm.isActive ? "active" : "inactive"}
+                onChange={(event) =>
+                  setFlavorForm({ ...flavorForm, isActive: event.target.value === "active" })
+                }
+              >
+                <option value="active">啟用</option>
+                <option value="inactive">停用</option>
+              </select>
+            </label>
+          </div>
+          <p className="form-status">
+            口味供自選禮盒挑選並各自管理庫存;停用後 POS 不再顯示,歷史紀錄保留。
+          </p>
+          <div className="form-actions">
+            {flavorForm.id ? (
+              <button
+                className="secondary-action"
+                onClick={() => setFlavorForm(emptyFlavor)}
+                type="button"
+              >
+                取消編輯
+              </button>
+            ) : null}
+            <button className="primary-action slim" disabled={saving} onClick={saveFlavor} type="button">
+              {flavorForm.id ? "更新口味" : "新增口味"}
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <section className="stack-grid">
+        <article className="panel data-card">
+          <h2>組合價（任選 N 件 $X）</h2>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>名稱</th>
+                  <th>商品數</th>
+                  <th>級距</th>
+                  <th>狀態</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {bundles.map((bundle) => (
+                  <tr key={bundle.id}>
+                    <td>{bundle.name}</td>
+                    <td>{bundle.productIds.length}</td>
+                    <td>
+                      {bundle.tiers
+                        .map((tier) => `${tier.quantity}件$${tier.price}`)
+                        .join("、")}
+                    </td>
+                    <td>{bundle.isActive ? "啟用" : "停用"}</td>
+                    <td>
+                      <div className="toolbar">
+                        <button
+                          className="secondary-action"
+                          onClick={() =>
+                            setBundleForm({
+                              id: bundle.id,
+                              name: bundle.name,
+                              isActive: bundle.isActive,
+                              productIds: [...bundle.productIds],
+                              tiers: bundle.tiers.map((tier) => ({ ...tier }))
+                            })
+                          }
+                          type="button"
+                        >
+                          編輯
+                        </button>
+                        <button
+                          className="secondary-action"
+                          disabled={saving}
+                          onClick={() => deleteBundle(bundle)}
+                          type="button"
+                        >
+                          刪除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {bundles.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>尚未建立組合價</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article className="panel data-card form-stack">
+          <h2>{bundleForm.id ? "編輯組合價" : "新增組合價"}</h2>
+          <p className="form-status">
+            勾選商品後,POS 結帳時同群商品會自動以最划算的組合計價(例:2件500、4件900),
+            之後套用的訂單折扣(如 9 折)以組合後金額計算。
+          </p>
+          <div className="field-row">
+            <label className="field">
+              <span>名稱</span>
+              <input
+                value={bundleForm.name}
+                onChange={(event) => setBundleForm({ ...bundleForm, name: event.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>狀態</span>
+              <select
+                value={bundleForm.isActive ? "active" : "inactive"}
+                onChange={(event) =>
+                  setBundleForm({ ...bundleForm, isActive: event.target.value === "active" })
+                }
+              >
+                <option value="active">啟用</option>
+                <option value="inactive">停用</option>
+              </select>
+            </label>
+          </div>
+          <div className="field">
+            <span>適用商品</span>
+            <div className="check-chip-list">
+              {products
+                .filter((product) => product.isActive)
+                .map((product) => (
+                  <label key={product.id} className="check-chip">
+                    <input
+                      checked={bundleForm.productIds.includes(product.id)}
+                      onChange={() => toggleBundleProduct(product.id)}
+                      type="checkbox"
+                    />{" "}
+                    {product.name}
+                  </label>
+                ))}
+            </div>
+          </div>
+          {bundleForm.tiers.map((tier, index) => (
+            <div className="field-row" key={index}>
+              <label className="field">
+                <span>件數</span>
+                <input
+                  type="number"
+                  min={2}
+                  value={tier.quantity || ""}
+                  onChange={(event) =>
+                    updateBundleTier(index, { quantity: Number(event.target.value) })
+                  }
+                />
+              </label>
+              <label className="field">
+                <span>組合價</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={tier.price || ""}
+                  onChange={(event) =>
+                    updateBundleTier(index, { price: Number(event.target.value) })
+                  }
+                />
+              </label>
+              <label className="field">
+                <span>&nbsp;</span>
+                <button
+                  className="secondary-action"
+                  onClick={() =>
+                    setBundleForm((current) => ({
+                      ...current,
+                      tiers: current.tiers.filter((_, tierIndex) => tierIndex !== index)
+                    }))
+                  }
+                  type="button"
+                >
+                  移除
+                </button>
+              </label>
+            </div>
+          ))}
+          <div className="form-actions">
+            <button
+              className="secondary-action"
+              onClick={() =>
+                setBundleForm((current) => ({
+                  ...current,
+                  tiers: [...current.tiers, { quantity: 2, price: 0 }]
+                }))
+              }
+              type="button"
+            >
+              新增級距
+            </button>
+            {bundleForm.id ? (
+              <button
+                className="secondary-action"
+                onClick={() => setBundleForm(emptyBundle)}
+                type="button"
+              >
+                取消編輯
+              </button>
+            ) : null}
+            <button className="primary-action slim" disabled={saving} onClick={saveBundle} type="button">
+              {bundleForm.id ? "更新組合價" : "新增組合價"}
             </button>
           </div>
         </article>

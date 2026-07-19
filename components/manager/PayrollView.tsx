@@ -24,6 +24,7 @@ export function PayrollView() {
   const [staffList, setStaffList] = useState<Array<{ id: string; name: string }>>([]);
   const [tierStaffId, setTierStaffId] = useState("");
   const [hasOverride, setHasOverride] = useState(false);
+  const [commissionMode, setCommissionMode] = useState<"daily" | "monthly">("daily");
   const [savingTiers, setSavingTiers] = useState(false);
   const [status, setStatus] = useState("讀取薪資資料中...");
 
@@ -69,11 +70,13 @@ export function PayrollView() {
     if (staffId) {
       setHasOverride(result.data.staffTiers != null);
       setTiers(result.data.staffTiers ?? result.data.tiers ?? []);
+      setCommissionMode(result.data.commissionMode ?? "daily");
       return;
     }
 
     setHasOverride(false);
     setTiers(result.data.tiers ?? []);
+    setCommissionMode("daily");
   }
 
   function updateTier(index: number, partial: Partial<CommissionTier>) {
@@ -89,7 +92,11 @@ export function PayrollView() {
     const response = await fetch("/api/commission", {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ tiers, staffId: tierStaffId || null })
+      body: JSON.stringify({
+        tiers,
+        staffId: tierStaffId || null,
+        commissionMode: tierStaffId ? commissionMode : undefined
+      })
     });
     const result = await response.json();
 
@@ -218,7 +225,9 @@ export function PayrollView() {
       <section className="panel data-card form-stack">
         <h2>抽成級距設定</h2>
         <p className="form-status">
-          當日個人業績達到門檻時，整筆業績依該級距比例抽成（取符合的最高門檻）。例如 2% 填 0.02。
+          {tierStaffId && commissionMode === "monthly"
+            ? "月結:下方級距即月結規則——「月」總實收業績達到門檻時,整月業績依該比例抽成(取符合的最高門檻)。例:月業績 15 萬抽 3% → 門檻填 150000、比例填 0.03。"
+            : "當日個人業績達到門檻時，整筆業績依該級距比例抽成（取符合的最高門檻）。例如 2% 填 0.02。"}
         </p>
         <div className="field-row">
           <label className="field">
@@ -236,18 +245,38 @@ export function PayrollView() {
             </select>
           </label>
           {tierStaffId ? (
-            <label className="field">
-              <span>&nbsp;</span>
-              <span className={hasOverride ? "status warn" : "status"}>
-                {hasOverride ? "使用個人級距" : "目前套用全域級距，儲存後改用個人級距"}
-              </span>
-            </label>
+            <>
+              <label className="field">
+                <span>抽成模式</span>
+                <select
+                  value={commissionMode}
+                  onChange={(event) =>
+                    setCommissionMode(event.target.value as "daily" | "monthly")
+                  }
+                >
+                  <option value="daily">日結（每日業績各自套級距）</option>
+                  <option value="monthly">月結（月總業績套級距，如 15 萬抽 3%）</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>&nbsp;</span>
+                <span className={hasOverride ? "status warn" : "status"}>
+                  {hasOverride ? "使用個人級距" : "目前套用全域級距，儲存後改用個人級距"}
+                </span>
+              </label>
+            </>
           ) : null}
         </div>
+        {tierStaffId && commissionMode === "monthly" ? (
+          <p className="form-status">
+            月結員工在「每日業績」報表的抽成欄顯示「月結」,抽成金額於月報表與薪資試算呈現;
+            按「儲存級距」會一併套用抽成模式。
+          </p>
+        ) : null}
         {tiers.map((tier, index) => (
           <div className="field-row" key={index}>
             <label className="field">
-              <span>日業績門檻</span>
+              <span>{tierStaffId && commissionMode === "monthly" ? "月業績門檻" : "日業績門檻"}</span>
               <input
                 type="number"
                 min={0}

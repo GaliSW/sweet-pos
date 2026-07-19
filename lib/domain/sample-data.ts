@@ -11,6 +11,8 @@ export type Product = {
     mode: "select" | "fixed";
     requiredFlavorCount?: number;
     includesScallionCracker?: boolean;
+    // 可選口味(空或未設定 = 全部口味可選)
+    allowedFlavorIds?: string[];
     fixedFlavors?: string[];
     fixedFlavorItems?: Array<{
       flavorId: string | null;

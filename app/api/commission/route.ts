@@ -21,6 +21,17 @@ export async function GET(request: Request) {
 
   const supabase = createSupabaseAdminClient();
   const sets = await fetchCommissionTierSets(supabase);
+  let commissionMode: "daily" | "monthly" = "daily";
+
+  if (staffId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("commission_mode")
+      .eq("id", staffId)
+      .maybeSingle();
+
+    commissionMode = (profile?.commission_mode as "daily" | "monthly") ?? "daily";
+  }
 
   return NextResponse.json({
     ok: true,
@@ -29,6 +40,7 @@ export async function GET(request: Request) {
       staffId,
       // 個人覆寫級距;null = 未設定(套用全域)
       staffTiers: staffId ? sets.byStaff.get(staffId) ?? null : null,
+      commissionMode,
       source: "supabase"
     }
   });
@@ -39,9 +51,17 @@ export async function PUT(request: Request) {
 
   if (guard.failure) return guard.failure;
 
-  const input = (await request.json()) as { tiers?: CommissionTier[]; staffId?: string | null };
+  const input = (await request.json()) as {
+    tiers?: CommissionTier[];
+    staffId?: string | null;
+    commissionMode?: "daily" | "monthly";
+  };
   const tiers = input.tiers ?? [];
   const staffId = input.staffId ?? null;
+
+  if (input.commissionMode && !["daily", "monthly"].includes(input.commissionMode)) {
+    return NextResponse.json({ ok: false, error: "抽成模式必須是日結或月結" }, { status: 400 });
+  }
 
   // 個人覆寫允許空陣列 = 清除覆寫、回到全域級距;全域至少要有一個級距
   if (!staffId && tiers.length === 0) {
@@ -77,6 +97,19 @@ export async function PUT(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+
+  // 個人抽成模式(日結/月結)存在 profiles 上
+  if (staffId && input.commissionMode) {
+    const { error: modeError } = await supabase
+      .from("profiles")
+      .update({ commission_mode: input.commissionMode })
+      .eq("id", staffId);
+
+    if (modeError) {
+      return NextResponse.json({ ok: false, error: modeError.message }, { status: 400 });
+    }
+  }
+
   let deleteQuery = supabase.from("commission_tiers").delete();
 
   deleteQuery = staffId ? deleteQuery.eq("staff_id", staffId) : deleteQuery.is("staff_id", null);
@@ -109,6 +142,7 @@ export async function PUT(request: Request) {
       tiers: sets.global,
       staffId,
       staffTiers: staffId ? sets.byStaff.get(staffId) ?? null : null,
+      commissionMode: input.commissionMode ?? "daily",
       source: "supabase"
     }
   });

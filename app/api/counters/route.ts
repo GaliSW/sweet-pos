@@ -207,7 +207,7 @@ export async function DELETE(request: Request) {
 
   if (guard.failure) return guard.failure;
 
-  const input = (await request.json()) as { id?: string };
+  const input = (await request.json()) as { id?: string; force?: boolean };
 
   if (!input.id) {
     return NextResponse.json({ ok: false, error: "缺少櫃位編號" }, { status: 400 });
@@ -239,7 +239,7 @@ export async function DELETE(request: Request) {
   const referenceCount =
     (ordersResult.count ?? 0) + (shiftsResult.count ?? 0) + (movementsResult.count ?? 0);
 
-  if (referenceCount > 0) {
+  if (referenceCount > 0 && !input.force) {
     const { error } = await supabase
       .from("counters")
       .update({ is_active: false })
@@ -258,6 +258,24 @@ export async function DELETE(request: Request) {
         source: "supabase"
       }
     });
+  }
+
+  // force:連同該櫃位全部歷史紀錄永久刪除(前端已要求輸入櫃位名稱確認並提示先匯出)。
+  // 順序:庫存異動(引用訂單) → 訂單(串刪品項/口味/預購) → 班表 → 月目標 → 櫃位。
+  if (referenceCount > 0 && input.force) {
+    const deletions = [
+      supabase.from("inventory_movements").delete().eq("counter_id", input.id),
+      supabase.from("orders").delete().eq("counter_id", input.id),
+      supabase.from("shifts").delete().eq("counter_id", input.id)
+    ];
+
+    for (const deletion of deletions) {
+      const { error } = await deletion;
+
+      if (error) {
+        return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      }
+    }
   }
 
   const { error: targetError } = await supabase

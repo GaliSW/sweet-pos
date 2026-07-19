@@ -35,12 +35,13 @@ export async function GET() {
   }
 
   const supabase = createSupabaseAdminClient();
-  const [productsResult, rulesResult] = await Promise.all([
+  const [productsResult, rulesResult, allowedResult] = await Promise.all([
     supabase.from("products").select("*").order("category").order("name"),
-    supabase.from("gift_box_rules").select("*")
+    supabase.from("gift_box_rules").select("*"),
+    supabase.from("gift_box_allowed_flavors").select("product_id, flavor_id")
   ]);
 
-  const error = productsResult.error ?? rulesResult.error;
+  const error = productsResult.error ?? rulesResult.error ?? allowedResult.error;
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -49,6 +50,13 @@ export async function GET() {
   const ruleByProductId = new Map(
     (rulesResult.data ?? []).map((rule) => [rule.product_id as string, rule])
   );
+  const allowedByProductId = new Map<string, string[]>();
+
+  for (const row of allowedResult.data ?? []) {
+    const list = allowedByProductId.get(row.product_id as string) ?? [];
+    list.push(row.flavor_id as string);
+    allowedByProductId.set(row.product_id as string, list);
+  }
 
   return NextResponse.json({
     ok: true,
@@ -68,7 +76,8 @@ export async function GET() {
             ? {
                 selectionMode: rule.selection_mode,
                 requiredFlavorCount: rule.required_flavor_count,
-                includesScallionCracker: rule.includes_scallion_cracker
+                includesScallionCracker: rule.includes_scallion_cracker,
+                allowedFlavorIds: allowedByProductId.get(product.id as string) ?? []
               }
             : null
         };
@@ -272,7 +281,27 @@ async function upsertGiftRule(
     { onConflict: "product_id" }
   );
 
-  return error?.message ?? null;
+  if (error) return error.message;
+
+  // 可選口味整組重寫(空 = 全部口味可選)
+  const { error: clearError } = await supabase
+    .from("gift_box_allowed_flavors")
+    .delete()
+    .eq("product_id", productId);
+
+  if (clearError) return clearError.message;
+
+  const allowedFlavorIds = Array.from(new Set(input.giftRule.allowedFlavorIds ?? []));
+
+  if (allowedFlavorIds.length > 0) {
+    const { error: insertError } = await supabase.from("gift_box_allowed_flavors").insert(
+      allowedFlavorIds.map((flavorId) => ({ product_id: productId, flavor_id: flavorId }))
+    );
+
+    if (insertError) return insertError.message;
+  }
+
+  return null;
 }
 
 function validateProductInput(input: UpsertProductInput) {
