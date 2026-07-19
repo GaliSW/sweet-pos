@@ -85,8 +85,9 @@ export type AppliedBundle = {
   discount: number;
 };
 
-// 組合價(指定商品群任選 N 件 $X):同群商品件數自動湊組,大組合優先、
-// 單價高的先入組(對客人最划算);湊不成組或組合價沒有比較便宜的部分照單價計。
+// 組合價(指定商品群任選 N 件 $X):同群商品件數自動湊組,以「折抵最大」的
+// 組合方式計算(例:4 件時 4件900 優於 2件500x2)。相同商品群若分成多筆組合
+// 設定,級距會先合併再一起計算。湊不成組或組合價沒有比較便宜的部分照單價計。
 // 回傳總折抵與套用明細;每件商品只會被一個組合使用一次。
 export function calculateBundleDiscount(
   items: BundleLineInput[],
@@ -102,44 +103,117 @@ export function calculateBundleDiscount(
   const applied: AppliedBundle[] = [];
   let totalDiscount = 0;
 
+  // 商品群完全相同的組合合併級距一起計算
+  const mergedBundles = new Map<string, BundleDefinition>();
+
   for (const bundle of bundles) {
     if (bundle.tiers.length === 0 || bundle.productIds.length === 0) continue;
 
+    const key = Array.from(new Set(bundle.productIds)).sort().join("|");
+    const existing = mergedBundles.get(key);
+
+    if (existing) {
+      existing.tiers = [...existing.tiers, ...bundle.tiers];
+      continue;
+    }
+
+    mergedBundles.set(key, {
+      ...bundle,
+      productIds: [...bundle.productIds],
+      tiers: [...bundle.tiers]
+    });
+  }
+
+  for (const bundle of mergedBundles.values()) {
     const productSet = new Set(bundle.productIds);
+    // 單價高的優先入組(折抵對客人最有利)
     const candidates = units
       .filter((unit) => !unit.used && productSet.has(unit.productId))
       .sort((left, right) => right.unitPrice - left.unitPrice);
-    const tiers = [...bundle.tiers].sort((left, right) => right.quantity - left.quantity);
-    const sets: AppliedBundleSet[] = [];
-    let cursor = 0;
+    const count = candidates.length;
 
-    for (const tier of tiers) {
-      while (candidates.length - cursor >= tier.quantity) {
-        const chunk = candidates.slice(cursor, cursor + tier.quantity);
-        const unitSum = roundCurrency(
-          chunk.reduce((total, unit) => total + unit.unitPrice, 0)
-        );
-        const discount = roundCurrency(unitSum - tier.price);
+    if (count === 0) continue;
 
-        if (discount <= 0) break;
+    const prefixSum: number[] = [0];
 
-        chunk.forEach((unit) => {
-          unit.used = true;
-        });
-        cursor += tier.quantity;
-        sets.push({ quantity: tier.quantity, price: tier.price, discount });
-        totalDiscount = roundCurrency(totalDiscount + discount);
+    for (let index = 0; index < count; index += 1) {
+      prefixSum.push(roundCurrency(prefixSum[index] + candidates[index].unitPrice));
+    }
+
+    // DP:coverCost[q] = 以組合覆蓋 q 件的最低組合價總和;
+    // 折抵 = 被覆蓋件數的單價合計 - 組合價合計,取全部 q 中折抵最大者。
+    const coverCost: number[] = Array(count + 1).fill(Number.POSITIVE_INFINITY);
+    const tierChoice: (BundleTier | null)[] = Array(count + 1).fill(null);
+    coverCost[0] = 0;
+
+    for (let quantity = 1; quantity <= count; quantity += 1) {
+      for (const tier of bundle.tiers) {
+        if (tier.quantity > quantity) continue;
+
+        const cost = coverCost[quantity - tier.quantity] + tier.price;
+
+        if (cost < coverCost[quantity]) {
+          coverCost[quantity] = cost;
+          tierChoice[quantity] = tier;
+        }
       }
     }
 
-    if (sets.length > 0) {
-      applied.push({
-        bundleId: bundle.id,
-        name: bundle.name,
-        sets,
-        discount: roundCurrency(sets.reduce((total, set) => total + set.discount, 0))
-      });
+    let bestQuantity = 0;
+    let bestDiscount = 0;
+
+    for (let quantity = 1; quantity <= count; quantity += 1) {
+      if (!Number.isFinite(coverCost[quantity])) continue;
+
+      const discount = roundCurrency(prefixSum[quantity] - coverCost[quantity]);
+
+      if (discount > bestDiscount) {
+        bestDiscount = discount;
+        bestQuantity = quantity;
+      }
     }
+
+    if (bestQuantity === 0) continue;
+
+    // 回溯使用的級距,依序切分被覆蓋的商品計算各組折抵(合計即 bestDiscount)
+    const usedTiers: BundleTier[] = [];
+    let remaining = bestQuantity;
+
+    while (remaining > 0) {
+      const tier = tierChoice[remaining];
+
+      if (!tier) break;
+
+      usedTiers.push(tier);
+      remaining -= tier.quantity;
+    }
+
+    usedTiers.sort((left, right) => right.quantity - left.quantity);
+
+    const sets: AppliedBundleSet[] = [];
+    let cursor = 0;
+
+    for (const tier of usedTiers) {
+      const chunkSum = roundCurrency(prefixSum[cursor + tier.quantity] - prefixSum[cursor]);
+      sets.push({
+        quantity: tier.quantity,
+        price: tier.price,
+        discount: roundCurrency(chunkSum - tier.price)
+      });
+      cursor += tier.quantity;
+    }
+
+    for (let index = 0; index < bestQuantity; index += 1) {
+      candidates[index].used = true;
+    }
+
+    totalDiscount = roundCurrency(totalDiscount + bestDiscount);
+    applied.push({
+      bundleId: bundle.id,
+      name: bundle.name,
+      sets,
+      discount: bestDiscount
+    });
   }
 
   return { totalDiscount, applied };

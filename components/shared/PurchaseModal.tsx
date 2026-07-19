@@ -43,14 +43,23 @@ export function PurchaseModal({
     }
 
     const data = result.data;
+    // 可進貨的商品:袋裝 + 固定口味禮盒(自選禮盒進的是口味庫存)
+    const selectModeIds = new Set(
+      (data.giftRules ?? [])
+        .filter((rule: { selection_mode: string }) => rule.selection_mode === "select")
+        .map((rule: { product_id: string }) => rule.product_id)
+    );
     const nextItems: ItemOption[] = [
       ...(data.products ?? [])
-        .filter((product: { category: string }) => product.category === "bag")
-        .map((product: { id: string; name: string; spec: string }) => ({
+        .filter(
+          (product: { id: string; category: string }) =>
+            product.category === "bag" || !selectModeIds.has(product.id)
+        )
+        .map((product: { id: string; category: string; name: string; spec: string }) => ({
           key: `product:${product.id}`,
           productId: product.id,
           flavorId: null,
-          label: `${product.name}（${product.spec}）`
+          label: `${product.name}（${product.spec}${product.category === "gift_box" ? "・禮盒" : ""}）`
         })),
       ...(data.flavors ?? []).map((flavor: { id: string; name: string; spec: string }) => ({
         key: `flavor:${flavor.id}`,

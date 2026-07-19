@@ -110,6 +110,54 @@ describe("calculateBundleDiscount", () => {
     expect(result.applied).toEqual([]);
   });
 
+  it("picks the cheapest combination instead of stacking small tiers", () => {
+    // 4 件 280:4件900(付 900)優於 2件500x2(付 1000)→ 折 1120-900=220
+    const result = calculateBundleDiscount(
+      [{ productId: "p-280", unitPrice: 280, quantity: 4 }],
+      bundles
+    );
+
+    expect(result.totalDiscount).toBe(220);
+    expect(result.applied[0].sets).toEqual([{ quantity: 4, price: 900, discount: 220 }]);
+  });
+
+  it("merges tiers from separate bundles that share the same product group", () => {
+    // 2件500 與 4件900 分成兩筆組合設定,同商品群應合併計算 → 4 件套 4件900
+    const result = calculateBundleDiscount(
+      [{ productId: "p-280", unitPrice: 280, quantity: 4 }],
+      [
+        {
+          id: "bundle-a",
+          name: "2件優惠",
+          productIds: ["p-280", "p-320"],
+          tiers: [{ quantity: 2, price: 500 }]
+        },
+        {
+          id: "bundle-b",
+          name: "4件優惠",
+          productIds: ["p-280", "p-320"],
+          tiers: [{ quantity: 4, price: 900 }]
+        }
+      ]
+    );
+
+    expect(result.totalDiscount).toBe(220);
+  });
+
+  it("combines tiers when that beats a single tier (6 items → 4+2)", () => {
+    // 6 件 280:4件900 + 2件500 = 1400,單價合計 1680 → 折 280
+    const result = calculateBundleDiscount(
+      [{ productId: "p-280", unitPrice: 280, quantity: 6 }],
+      bundles
+    );
+
+    expect(result.totalDiscount).toBe(280);
+    expect(result.applied[0].sets).toEqual([
+      { quantity: 4, price: 900, discount: 220 },
+      { quantity: 2, price: 500, discount: 60 }
+    ]);
+  });
+
   it("ignores products outside the bundle group", () => {
     const result = calculateBundleDiscount(
       [

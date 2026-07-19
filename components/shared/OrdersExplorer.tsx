@@ -99,7 +99,8 @@ const paymentOptions = [
 
 export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);
+  // 員工預設看「今天」(合計即當日總額);店長預設看整月
+  const [from, setFrom] = useState(variant === "staff" ? today : `${today.slice(0, 7)}-01`);
   const [to, setTo] = useState(today);
   const [counterId, setCounterId] = useState("all");
   const [search, setSearch] = useState("");
@@ -149,6 +150,16 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
       return haystack.includes(keyword);
     });
   }, [orders, search]);
+
+  // 目前篩選範圍內(排除已作廢)的實收合計,員工也能直接看到當日總額
+  const completedOrders = useMemo(
+    () => visibleOrders.filter((order) => order.status === "completed"),
+    [visibleOrders]
+  );
+  const receivedTotal = useMemo(
+    () => completedOrders.reduce((total, order) => total + order.receivedAmount, 0),
+    [completedOrders]
+  );
 
   async function loadCatalog() {
     const result = await fetch("/api/catalog")
@@ -368,6 +379,9 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
               onChange={(event) => setSearch(event.target.value)}
             />
           </label>
+          <span className="pill">
+            實收合計 {formatCurrency(receivedTotal)}（{completedOrders.length} 筆）
+          </span>
           <span className="pill">{status}</span>
         </div>
       </section>

@@ -46,6 +46,12 @@ type FlavorOption = {
 
 const crackerName = "經典原味蔥軋餅";
 
+// 袋裝與固定口味禮盒(或未設規則的禮盒)扣商品自身庫存;
+// 只有自選禮盒扣口味庫存。
+function usesOwnStock(product: Product) {
+  return product.category === "bag" || product.giftRule?.mode !== "select";
+}
+
 export function PosRegister() {
   const [category, setCategory] = useState<Category>("popular");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -226,7 +232,7 @@ export function PosRegister() {
       usage.set(key, (usage.get(key) ?? 0) + quantity);
 
     for (const item of cart) {
-      if (item.product.category === "bag") {
+      if (usesOwnStock(item.product)) {
         add(`product:${item.product.id}`, item.quantity);
         continue;
       }
@@ -303,14 +309,15 @@ export function PosRegister() {
       });
 
       if (result.valid) {
+        // 固定口味禮盒扣自身庫存,內容物僅供明細顯示
         const giftFlavors =
           product.giftRule.fixedFlavorItems ?? createGiftFlavorInputs(result.includedItems);
-        const shortage = giftBoxShortage(product, giftFlavors, 1);
+        const available = availableFor(`product:${product.id}`);
 
         addCartItem(product, result.includedItems, giftFlavors);
 
-        if (shortage) {
-          setNotice(`${shortage}，超出部分將以預購出單`);
+        if (available != null && available < 1) {
+          setNotice(`${product.name} 現貨不足，超出部分將以預購出單`);
         }
       }
       return;
@@ -361,15 +368,14 @@ export function PosRegister() {
     const delta = quantity - item.quantity;
 
     if (delta > 0) {
-      const shortage =
-        item.product.category === "bag"
-          ? (() => {
-              const available = availableFor(`product:${item.product.id}`);
-              return available != null && available < delta
-                ? `${item.product.name} 現貨不足`
-                : null;
-            })()
-          : giftBoxShortage(item.product, item.giftFlavors, delta);
+      const shortage = usesOwnStock(item.product)
+        ? (() => {
+            const available = availableFor(`product:${item.product.id}`);
+            return available != null && available < delta
+              ? `${item.product.name} 現貨不足`
+              : null;
+          })()
+        : giftBoxShortage(item.product, item.giftFlavors, delta);
 
       if (shortage) {
         setNotice(`${shortage}，超出部分將以預購出單`);
@@ -465,7 +471,7 @@ export function PosRegister() {
     };
 
     for (const item of cart) {
-      if (item.product.category === "bag") {
+      if (usesOwnStock(item.product)) {
         addNeed(`product:${item.product.id}`, item.product.name, item.quantity);
         continue;
       }
@@ -569,8 +575,9 @@ export function PosRegister() {
           </div>
           <div className="product-grid">
             {visibleProducts.map((product) => {
-              const available =
-                product.category === "bag" ? availableFor(`product:${product.id}`) : null;
+              const available = usesOwnStock(product)
+                ? availableFor(`product:${product.id}`)
+                : null;
               const soldOut = available != null && available <= 0;
 
               return (
@@ -589,7 +596,7 @@ export function PosRegister() {
                   <span className="product-meta">
                     <span>
                       {product.spec}
-                      {product.category === "bag" && stockByKey
+                      {usesOwnStock(product) && stockByKey
                         ? `｜庫存 ${stockByKey[`product:${product.id}`] ?? 0}`
                         : ""}
                     </span>
