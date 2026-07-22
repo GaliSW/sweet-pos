@@ -57,6 +57,9 @@ export function PosRegister() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedDiscountId, setSelectedDiscountId] = useState("none");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  // 手動扣款(臨時活動,如滿千送品項)與備註
+  const [manualDiscount, setManualDiscount] = useState("");
+  const [orderNote, setOrderNote] = useState("");
   const [products, setProducts] = useState<Product[]>(fallbackProducts);
   const [discounts, setDiscounts] = useState<DiscountOption[]>(fallbackDiscounts);
   const [flavors, setFlavors] = useState<FlavorOption[]>(
@@ -216,9 +219,10 @@ export function PosRegister() {
           quantity: item.quantity
         })),
         discount: toDomainDiscount(selectedDiscount),
-        bundleDiscount: bundleResult.totalDiscount
+        bundleDiscount: bundleResult.totalDiscount,
+        manualDiscount: Number(manualDiscount) || 0
       }),
-    [cart, selectedDiscount, bundleResult]
+    [cart, selectedDiscount, bundleResult, manualDiscount]
   );
 
   function flavorStockKey(flavor: { flavorId: string | null; flavorName: string }) {
@@ -520,6 +524,8 @@ export function PosRegister() {
           counterId: counterId || counters[0]?.id,
           discountId: selectedDiscountId === "none" ? null : selectedDiscountId,
           paymentMethod,
+          manualDiscount: Number(manualDiscount) || 0,
+          note: orderNote.trim() || undefined,
           items: cart.map((item) => ({
             productId: item.product.id,
             quantity: item.quantity,
@@ -541,6 +547,8 @@ export function PosRegister() {
         `訂單完成：${sellerLabel} / ${paymentLabel(paymentMethod)} / 應收 $${totals.receivableAmount}`
       );
       setCart([]);
+      setManualDiscount("");
+      setOrderNote("");
       void loadStock(counterId);
     } catch {
       setNotice("訂單建立失敗，請稍後再試");
@@ -687,6 +695,27 @@ export function PosRegister() {
                 </select>
               </label>
             </div>
+            <div className="field-row">
+              <label className="field">
+                <span>扣款金額（活動用，可空）</span>
+                <input
+                  inputMode="numeric"
+                  min={0}
+                  placeholder="例：滿千送扣 280"
+                  type="number"
+                  value={manualDiscount}
+                  onChange={(event) => setManualDiscount(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>備註（可空）</span>
+                <input
+                  placeholder="例：滿千送包種烏龍"
+                  value={orderNote}
+                  onChange={(event) => setOrderNote(event.target.value)}
+                />
+              </label>
+            </div>
             <label className="field">
               <span>銷售人員（依班表自動帶入）</span>
               <input
@@ -728,6 +757,12 @@ export function PosRegister() {
                 <span>折扣金額</span>
                 <strong>-${totals.discountAmount}</strong>
               </div>
+              {totals.manualDiscountAmount > 0 ? (
+                <div className="total-line">
+                  <span>手動扣款{orderNote.trim() ? `（${orderNote.trim()}）` : ""}</span>
+                  <strong>-${totals.manualDiscountAmount}</strong>
+                </div>
+              ) : null}
               <div className="total-line grand">
                 <span>應收</span>
                 <strong>${totals.receivableAmount}</strong>

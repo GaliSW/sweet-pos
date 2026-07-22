@@ -53,6 +53,25 @@ describe("calculateOrderTotals", () => {
     expect(totals.discountAmount).toBe(50);
     expect(totals.receivableAmount).toBe(450);
   });
+
+  it("subtracts manual discount last and never below zero", () => {
+    // 滿千送:下單品項後手動扣掉單品金額
+    const totals = calculateOrderTotals({
+      items: [{ unitPrice: 280, quantity: 4 }],
+      manualDiscount: 280
+    });
+
+    expect(totals.manualDiscountAmount).toBe(280);
+    expect(totals.receivableAmount).toBe(840);
+
+    const overDeduct = calculateOrderTotals({
+      items: [{ unitPrice: 280, quantity: 1 }],
+      manualDiscount: 999
+    });
+
+    expect(overDeduct.manualDiscountAmount).toBe(280);
+    expect(overDeduct.receivableAmount).toBe(0);
+  });
 });
 
 describe("calculateBundleDiscount", () => {

@@ -19,6 +19,7 @@ export type OrderTotals = {
   salesAmount: number;
   bundleDiscountAmount: number;
   discountAmount: number;
+  manualDiscountAmount: number;
   receivableAmount: number;
   receivedAmount: number;
 };
@@ -28,6 +29,8 @@ export function calculateOrderTotals(input: {
   discount?: Discount | null;
   // 組合價折抵(先扣組合折抵,訂單折扣以組合後金額計算)
   bundleDiscount?: number;
+  // 手動扣款(臨時活動,如滿千送品項),最後才扣、不可扣到負
+  manualDiscount?: number;
 }): OrderTotals {
   const salesAmount = roundCurrency(
     input.items.reduce((total, item) => total + item.unitPrice * item.quantity, 0)
@@ -40,15 +43,20 @@ export function calculateOrderTotals(input: {
     roundCurrency(salesAmount - bundleDiscountAmount),
     input.discount
   );
+  const manualDiscountAmount = Math.min(
+    Math.max(0, roundCurrency(salesAmount - bundleDiscountAmount - discountAmount)),
+    Math.max(0, roundCurrency(input.manualDiscount ?? 0))
+  );
   const receivableAmount = Math.max(
     0,
-    roundCurrency(salesAmount - bundleDiscountAmount - discountAmount)
+    roundCurrency(salesAmount - bundleDiscountAmount - discountAmount - manualDiscountAmount)
   );
 
   return {
     salesAmount,
     bundleDiscountAmount,
     discountAmount,
+    manualDiscountAmount,
     receivableAmount,
     receivedAmount: receivableAmount
   };

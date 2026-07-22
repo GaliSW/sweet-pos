@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from("orders")
     .select(
-      "id, order_no, created_at, counter_id, seller_id, seller2_id, cashier_id, discount_id, payment_method, sales_amount, bundle_discount_amount, discount_amount, receivable_amount, received_amount, status, void_reason, counters(name), seller:profiles!orders_seller_id_fkey(display_name), seller2:profiles!orders_seller2_id_fkey(display_name), cashier:profiles!orders_cashier_id_fkey(display_name), voider:profiles!orders_voided_by_fkey(display_name), editor:profiles!orders_edited_by_fkey(display_name)"
+      "id, order_no, created_at, counter_id, seller_id, seller2_id, cashier_id, discount_id, payment_method, sales_amount, bundle_discount_amount, discount_amount, manual_discount_amount, note, receivable_amount, received_amount, status, void_reason, counters(name), seller:profiles!orders_seller_id_fkey(display_name), seller2:profiles!orders_seller2_id_fkey(display_name), cashier:profiles!orders_cashier_id_fkey(display_name), voider:profiles!orders_voided_by_fkey(display_name), editor:profiles!orders_edited_by_fkey(display_name)"
     )
     .gte("created_at", taipeiDayStart(from))
     .lt("created_at", taipeiDayStart(nextDay(to)))
@@ -164,6 +164,8 @@ export async function GET(request: Request) {
         salesAmount: Number(order.sales_amount),
         bundleDiscountAmount: Number(order.bundle_discount_amount ?? 0),
         discountAmount: Number(order.discount_amount),
+        manualDiscountAmount: Number(order.manual_discount_amount ?? 0),
+        note: order.note,
         receivedAmount: Number(order.received_amount),
         status: order.status,
         voidReason: order.void_reason,
@@ -199,6 +201,8 @@ export async function PATCH(request: Request) {
     discountId?: string | null;
     paymentMethod?: string;
     createdAt?: string | null;
+    manualDiscount?: number;
+    note?: string;
     items?: CreateOrderInput["items"];
   };
 
@@ -244,7 +248,9 @@ export async function PATCH(request: Request) {
       p_items: input.items,
       p_edited_by: editedBy,
       p_created_at: input.createdAt ?? null,
-      p_bundle_discount: bundleDiscount
+      p_bundle_discount: bundleDiscount,
+      p_manual_discount: input.manualDiscount ?? 0,
+      p_note: input.note ?? null
     });
 
     if (error) {
@@ -347,14 +353,28 @@ export async function POST(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const isManager = !guard.profile || guard.profile.role === "manager";
+  // 店長補單:可指定銷售人員與訂單時間(業績/抽成照指定內容入帳)
+  const isBackfill = isManager && Boolean(input.sellerId);
 
-  // 銷售人員不由前端指定:依訂單成立當下的已發布班表帶入當班人員(共班掛兩人),
-  // 無人當班時記在登入者名下。收銀一律等於主銷售。
-  const onDuty = await getOnDutySellers(supabase, input.counterId);
-  const fallbackSellerId =
-    guard.profile?.id ?? process.env.DEMO_CASHIER_ID ?? defaultCashierId;
-  const sellerId = onDuty[0]?.id ?? fallbackSellerId;
-  const seller2Id = onDuty[1]?.id ?? null;
+  let sellerId: string;
+  let seller2Id: string | null;
+  let sellerNames: string[] = [];
+
+  if (isBackfill) {
+    sellerId = input.sellerId as string;
+    seller2Id = input.seller2Id ?? null;
+  } else {
+    // 銷售人員不由前端指定:依訂單成立當下的已發布班表帶入當班人員(共班掛兩人),
+    // 無人當班時記在登入者名下。收銀一律等於主銷售。
+    const onDuty = await getOnDutySellers(supabase, input.counterId);
+    const fallbackSellerId =
+      guard.profile?.id ?? process.env.DEMO_CASHIER_ID ?? defaultCashierId;
+    sellerId = onDuty[0]?.id ?? fallbackSellerId;
+    seller2Id = onDuty[1]?.id ?? null;
+    sellerNames = onDuty.map((seller) => seller.displayName);
+  }
+
   const bundleDiscount = await computeOrderBundleDiscount(
     supabase,
     input.items.map((item) => ({ productId: item.productId, quantity: item.quantity }))
@@ -368,7 +388,10 @@ export async function POST(request: Request) {
     p_discount_id: input.discountId ?? null,
     p_payment_method: input.paymentMethod,
     p_items: input.items,
-    p_bundle_discount: bundleDiscount
+    p_bundle_discount: bundleDiscount,
+    p_manual_discount: input.manualDiscount ?? 0,
+    p_note: input.note ?? null,
+    p_created_at: isBackfill && input.createdAt ? input.createdAt : null
   });
 
   if (error) {
@@ -379,7 +402,7 @@ export async function POST(request: Request) {
     ok: true,
     data: {
       orderId: data,
-      sellers: onDuty.map((seller) => seller.displayName),
+      sellers: sellerNames,
       source: "supabase"
     }
   });

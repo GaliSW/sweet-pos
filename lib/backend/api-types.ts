@@ -13,11 +13,17 @@ export type CreateOrderItemInput = {
 
 export type CreateOrderInput = {
   counterId: string;
-  // 銷售人員由後端依當下班表帶入,前端不再指定
+  // 銷售人員由後端依當下班表帶入;店長補單時可指定(見 backfill)
   sellerId?: string;
+  seller2Id?: string | null;
   cashierId?: string;
   discountId: string | null;
   paymentMethod: "cash" | "credit_card" | "line_pay" | "jkopay" | "transfer";
+  // 手動扣款(臨時活動)與備註
+  manualDiscount?: number;
+  note?: string;
+  // 店長補單:指定訂單時間(ISO);一般員工帶入會被忽略
+  createdAt?: string | null;
   items: CreateOrderItemInput[];
 };
 

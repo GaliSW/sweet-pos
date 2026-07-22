@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "db:start": "npx supabase start",
     "db:stop": "npx supabase stop",
-    "db:reset": "npx supabase db reset"
+    "db:reset": "npx supabase db reset",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

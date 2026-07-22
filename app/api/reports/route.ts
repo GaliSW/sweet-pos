@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   let ordersQuery = supabase
     .from("orders")
     .select(
-      "id, created_at, seller_id, seller2_id, counter_id, discount_id, sales_amount, bundle_discount_amount, discount_amount, received_amount, seller:profiles!orders_seller_id_fkey(display_name), seller2:profiles!orders_seller2_id_fkey(display_name), counters(name)"
+      "id, created_at, seller_id, seller2_id, counter_id, discount_id, sales_amount, bundle_discount_amount, discount_amount, manual_discount_amount, received_amount, seller:profiles!orders_seller_id_fkey(display_name), seller2:profiles!orders_seller2_id_fkey(display_name), counters(name)"
     )
     .eq("status", "completed")
     .gte("created_at", taipeiDayStart(from))
@@ -105,8 +105,11 @@ export async function GET(request: Request) {
     counterName: relationName(order.counters),
     discountId: order.discount_id as string | null,
     salesAmount: Number(order.sales_amount),
-    // 折讓 = 組合價折抵 + 訂單折扣
-    discountAmount: Number(order.discount_amount) + Number(order.bundle_discount_amount ?? 0),
+    // 折讓 = 組合價折抵 + 訂單折扣 + 手動扣款
+    discountAmount:
+      Number(order.discount_amount) +
+      Number(order.bundle_discount_amount ?? 0) +
+      Number(order.manual_discount_amount ?? 0),
     receivedAmount: Number(order.received_amount)
   }));
 
