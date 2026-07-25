@@ -285,6 +285,28 @@ describe("庫存:批次進貨 / 交班盤點 / 固定禮盒獨立庫存", () => 
     expect(await stockOf("包種烏龍")).toBe(10);
   });
 
+  it("自訂排序:回寫 sort_order 後庫存摘要照新順序排列", async () => {
+    // 目前測試櫃有:包種烏龍(口味)、發禮盒(商品)。指定發禮盒排前面。
+    const saved = await staff.patch("/api/inventory/sort", {
+      items: [{ productId: SEED.fortuneGiftBox }, { flavorId: SEED.flavorOolong }]
+    });
+
+    expect(saved.ok).toBe(true);
+
+    const inventory = await manager.get(`/api/inventory?counterId=${counterId}`);
+    const names = ((inventory.data as any).summary as any[]).map((row) => row.itemName);
+    expect(names.indexOf("發禮盒")).toBeLessThan(names.indexOf("包種烏龍"));
+
+    // 反轉順序再驗一次
+    await staff.patch("/api/inventory/sort", {
+      items: [{ flavorId: SEED.flavorOolong }, { productId: SEED.fortuneGiftBox }]
+    });
+
+    const reversed = await manager.get(`/api/inventory?counterId=${counterId}`);
+    const reversedNames = ((reversed.data as any).summary as any[]).map((row) => row.itemName);
+    expect(reversedNames.indexOf("包種烏龍")).toBeLessThan(reversedNames.indexOf("發禮盒"));
+  });
+
   it("交班盤點重設庫存基準", async () => {
     const result = await staff.post("/api/inventory", {
       counterId,

@@ -29,7 +29,7 @@ const movementLabels: Record<InventoryMovementType, string> = {
 };
 
 const movementSelect =
-  "id, counter_id, product_id, flavor_id, movement_type, quantity, counted_quantity, note, created_by, created_at, updated_at, reviewed_at, counters(name), products(name, spec), flavors(name, spec), created_profile:profiles!inventory_movements_created_by_fkey(display_name), updated_profile:profiles!inventory_movements_updated_by_fkey(display_name), reviewed_profile:profiles!inventory_movements_reviewed_by_fkey(display_name)";
+  "id, counter_id, product_id, flavor_id, movement_type, quantity, counted_quantity, note, created_by, created_at, updated_at, reviewed_at, counters(name), products(name, spec, sort_order), flavors(name, spec, sort_order), created_profile:profiles!inventory_movements_created_by_fkey(display_name), updated_profile:profiles!inventory_movements_updated_by_fkey(display_name), reviewed_profile:profiles!inventory_movements_reviewed_by_fkey(display_name)";
 
 export async function GET(request: Request) {
   const guard = await requireRole();
@@ -80,6 +80,7 @@ export async function GET(request: Request) {
       itemKey: isFlavor ? `flavor:${movement.flavor_id}` : `product:${movement.product_id}`,
       itemName: isFlavor ? relationName(movement.flavors) : relationName(movement.products),
       itemSpec: isFlavor ? relationSpec(movement.flavors) : relationSpec(movement.products),
+      itemSortOrder: relationSortOrder(isFlavor ? movement.flavors : movement.products),
       movementType: movement.movement_type as InventoryMovementType,
       movementLabel: movementLabels[movement.movement_type as InventoryMovementType],
       quantity: movement.quantity,
@@ -419,6 +420,7 @@ function buildInventorySummary(
     flavorId: string | null;
     itemName: string;
     itemSpec: string;
+    itemSortOrder: number | null;
     quantity: number;
     countedQuantity: number | null;
   }>
@@ -434,6 +436,7 @@ function buildInventorySummary(
       flavorId: string | null;
       itemName: string;
       itemSpec: string;
+      itemSortOrder: number | null;
       stock: number;
     }
   >();
@@ -450,6 +453,7 @@ function buildInventorySummary(
         flavorId: movement.flavorId,
         itemName: movement.itemName,
         itemSpec: movement.itemSpec,
+        itemSortOrder: movement.itemSortOrder,
         stock: 0
       };
 
@@ -459,8 +463,13 @@ function buildInventorySummary(
     });
   }
 
-  return Array.from(summary.values()).sort((left, right) =>
-    `${left.counterName}${left.itemName}`.localeCompare(`${right.counterName}${right.itemName}`)
+  // 同櫃位內依自訂排序(未設定者排後面),再依名稱
+  return Array.from(summary.values()).sort(
+    (left, right) =>
+      left.counterName.localeCompare(right.counterName) ||
+      (left.itemSortOrder ?? Number.MAX_SAFE_INTEGER) -
+        (right.itemSortOrder ?? Number.MAX_SAFE_INTEGER) ||
+      left.itemName.localeCompare(right.itemName)
   );
 }
 
@@ -474,4 +483,15 @@ function relationSpec(value: unknown) {
   if (Array.isArray(value)) return value[0]?.spec ?? "";
   if (value && typeof value === "object" && "spec" in value) return String(value.spec);
   return "";
+}
+
+function relationSortOrder(value: unknown): number | null {
+  const record = Array.isArray(value) ? value[0] : value;
+
+  if (record && typeof record === "object" && "sort_order" in record) {
+    const sortOrder = (record as { sort_order: number | null }).sort_order;
+    return sortOrder == null ? null : Number(sortOrder);
+  }
+
+  return null;
 }

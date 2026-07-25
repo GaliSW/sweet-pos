@@ -1239,6 +1239,23 @@ select:focus-visible {
   accent-color: var(--accent-strong);
 }
 
+/* 庫存摘要拖曳排序 */
+.drag-row {
+  cursor: grab;
+}
+
+.drag-row.dragging {
+  opacity: 0.45;
+  background: var(--accent-soft);
+}
+
+.drag-handle {
+  color: var(--faint);
+  margin-right: 8px;
+  cursor: grab;
+  user-select: none;
+}
+
 .inventory-form {
   display: grid;
   gap: 12px;

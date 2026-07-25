@@ -25,6 +25,9 @@ type Movement = {
 
 type SummaryRow = {
   counterName: string;
+  itemKey: string;
+  productId: string | null;
+  flavorId: string | null;
   itemName: string;
   itemSpec: string;
   stock: number;
@@ -41,6 +44,10 @@ export function InventoryDashboard() {
   const [status, setStatus] = useState("讀取庫存資料中...");
   const [working, setWorking] = useState(false);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+
+  // 選定單一櫃位時才能拖曳排序(「全部」檢視混多櫃,順序無意義)
+  const canReorder = counterId !== "all";
 
   const visibleMovements = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -94,6 +101,40 @@ export function InventoryDashboard() {
     setMovements(result.data.movements ?? []);
     setSummary(result.data.summary ?? []);
     setStatus(result.data.source === "supabase" ? "已連線本地資料庫" : "Demo 模式");
+  }
+
+  // 拖曳調整庫存摘要順序:順序存於商品/口味(全店共用),POS 與品項清單同步套用
+  function handleSortDrop(targetKey: string) {
+    if (!dragKey || dragKey === targetKey) {
+      setDragKey(null);
+      return;
+    }
+
+    const rows = [...summary];
+    const from = rows.findIndex((row) => row.itemKey === dragKey);
+    const to = rows.findIndex((row) => row.itemKey === targetKey);
+
+    setDragKey(null);
+
+    if (from < 0 || to < 0) return;
+
+    const [moved] = rows.splice(from, 1);
+    rows.splice(to, 0, moved);
+    setSummary(rows);
+    void persistSortOrder(rows);
+  }
+
+  async function persistSortOrder(rows: SummaryRow[]) {
+    const response = await fetch("/api/inventory/sort", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        items: rows.map((row) => ({ productId: row.productId, flavorId: row.flavorId }))
+      })
+    });
+    const result = await response.json();
+
+    setStatus(result.ok ? "排序已儲存（POS 與品項清單同步套用）" : result.error);
   }
 
   async function reviewMovement(movement: Movement) {
@@ -179,7 +220,12 @@ export function InventoryDashboard() {
       </section>
 
       <section className="panel data-card">
-        <h2>庫存摘要</h2>
+        <div className="panel-header">
+          <h2>庫存摘要</h2>
+          <span className="pill">
+            {canReorder ? "拖曳列可自訂排序" : "選擇單一櫃位即可拖曳排序"}
+          </span>
+        </div>
         <div className="table-scroll">
           <table>
             <thead>
@@ -195,9 +241,28 @@ export function InventoryDashboard() {
                 const label = row.stock <= 0 ? "待盤點 / 缺貨" : row.stock <= 10 ? "低庫存" : "正常";
 
                 return (
-                  <tr key={`${row.counterName}-${row.itemName}-${row.itemSpec}`}>
+                  <tr
+                    className={canReorder ? `drag-row ${dragKey === row.itemKey ? "dragging" : ""}` : ""}
+                    draggable={canReorder}
+                    key={`${row.counterName}-${row.itemKey}`}
+                    onDragEnd={() => setDragKey(null)}
+                    onDragOver={(event) => {
+                      if (canReorder) event.preventDefault();
+                    }}
+                    onDragStart={() => {
+                      if (canReorder) setDragKey(row.itemKey);
+                    }}
+                    onDrop={() => {
+                      if (canReorder) handleSortDrop(row.itemKey);
+                    }}
+                  >
                     <td>{row.counterName}</td>
                     <td>
+                      {canReorder ? (
+                        <span aria-hidden className="drag-handle">
+                          ⠿
+                        </span>
+                      ) : null}
                       {row.itemName}（{row.itemSpec}）
                     </td>
                     <td>{row.stock}</td>

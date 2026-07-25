@@ -33,6 +33,9 @@ type InventoryMovement = {
 
 type InventorySummary = {
   counterName: string;
+  itemKey: string;
+  productId: string | null;
+  flavorId: string | null;
   itemName: string;
   itemSpec: string;
   stock: number;
@@ -79,6 +82,8 @@ export function InventoryMovementForm() {
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
+  // 庫存摘要拖曳排序中的列
+  const [dragKey, setDragKey] = useState<string | null>(null);
   const [recordsOpen, setRecordsOpen] = useState(false);
   const [recordSearch, setRecordSearch] = useState("");
   const [recordType, setRecordType] = useState<"all" | InventoryMovementType>("all");
@@ -191,6 +196,40 @@ export function InventoryMovementForm() {
     setMovements(result.data.movements ?? []);
     setSummary(result.data.summary ?? []);
     setStatus(result.data.source === "supabase" ? "已連線本地資料庫" : "Demo 模式");
+  }
+
+  // 拖曳調整庫存摘要順序:順序存於商品/口味(全店共用),POS 與品項清單同步套用
+  function handleSortDrop(targetKey: string) {
+    if (!dragKey || dragKey === targetKey) {
+      setDragKey(null);
+      return;
+    }
+
+    const rows = [...summary];
+    const from = rows.findIndex((row) => row.itemKey === dragKey);
+    const to = rows.findIndex((row) => row.itemKey === targetKey);
+
+    setDragKey(null);
+
+    if (from < 0 || to < 0) return;
+
+    const [moved] = rows.splice(from, 1);
+    rows.splice(to, 0, moved);
+    setSummary(rows);
+    void persistSortOrder(rows);
+  }
+
+  async function persistSortOrder(rows: InventorySummary[]) {
+    const response = await fetch("/api/inventory/sort", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        items: rows.map((row) => ({ productId: row.productId, flavorId: row.flavorId }))
+      })
+    });
+    const result = await response.json();
+
+    setStatus(result.ok ? "排序已儲存（POS 與品項清單同步套用）" : result.error);
   }
 
   function canEdit(movement: InventoryMovement) {
@@ -394,7 +433,10 @@ export function InventoryMovementForm() {
       </form>
 
       <section className="panel data-card">
-        <h2>庫存摘要</h2>
+        <div className="panel-header">
+          <h2>庫存摘要</h2>
+          <span className="pill">拖曳列可自訂排序</span>
+        </div>
         <div className="table-scroll">
           <table>
             <thead>
@@ -406,9 +448,20 @@ export function InventoryMovementForm() {
             </thead>
             <tbody>
               {summary.map((row) => (
-                <tr key={`${row.counterName}-${row.itemName}-${row.itemSpec}`}>
+                <tr
+                  className={`drag-row ${dragKey === row.itemKey ? "dragging" : ""}`}
+                  draggable
+                  key={row.itemKey}
+                  onDragEnd={() => setDragKey(null)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDragStart={() => setDragKey(row.itemKey)}
+                  onDrop={() => handleSortDrop(row.itemKey)}
+                >
                   <td>{row.counterName}</td>
                   <td>
+                    <span aria-hidden className="drag-handle">
+                      ⠿
+                    </span>
                     {row.itemName}（{row.itemSpec}）
                   </td>
                   <td>

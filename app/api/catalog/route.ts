@@ -35,9 +35,21 @@ export async function GET() {
     allowedFlavorsResult,
     bundlesResult
   ] = await Promise.all([
-    supabase.from("products").select("*").eq("is_active", true).order("category"),
+    // 依自訂排序(庫存列表拖曳設定,未設定者排後面)再依名稱
+    supabase
+      .from("products")
+      .select("*")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true, nullsFirst: false })
+      .order("category")
+      .order("name"),
     supabase.from("discounts").select("*").eq("is_active", true).order("name"),
-    supabase.from("flavors").select("*").eq("is_active", true).order("name"),
+    supabase
+      .from("flavors")
+      .select("*")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true, nullsFirst: false })
+      .order("name"),
     // 排班/業績歸屬名單納入店長(店長也可排班、銷售)
     supabase
       .from("profiles")
