@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import type { TouchEvent as ReactTouchEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { InventoryMovementType } from "@/lib/backend/api-types";
 import { PurchaseModal } from "@/components/shared/PurchaseModal";
 import { counters as fallbackCounters } from "@/lib/domain/sample-data";
@@ -45,9 +46,14 @@ export function InventoryDashboard() {
   const [working, setWorking] = useState(false);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [dragKey, setDragKey] = useState<string | null>(null);
+  const summaryRef = useRef<SummaryRow[]>([]);
 
   // 選定單一櫃位時才能拖曳排序(「全部」檢視混多櫃,順序無意義)
   const canReorder = counterId !== "all";
+
+  useEffect(() => {
+    summaryRef.current = summary;
+  }, [summary]);
 
   const visibleMovements = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -101,6 +107,36 @@ export function InventoryDashboard() {
     setMovements(result.data.movements ?? []);
     setSummary(result.data.summary ?? []);
     setStatus(result.data.source === "supabase" ? "已連線本地資料庫" : "Demo 模式");
+  }
+
+  // 手機觸控:按住 ⠿ 把手上下滑即時換位,放開儲存
+  function handleTouchMove(event: ReactTouchEvent) {
+    if (!dragKey) return;
+
+    const touch = event.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetKey = element?.closest("tr[data-item-key]")?.getAttribute("data-item-key");
+
+    if (!targetKey || targetKey === dragKey) return;
+
+    setSummary((current) => {
+      const rows = [...current];
+      const from = rows.findIndex((row) => row.itemKey === dragKey);
+      const to = rows.findIndex((row) => row.itemKey === targetKey);
+
+      if (from < 0 || to < 0) return current;
+
+      const [moved] = rows.splice(from, 1);
+      rows.splice(to, 0, moved);
+      return rows;
+    });
+  }
+
+  function handleTouchEnd() {
+    if (!dragKey) return;
+
+    setDragKey(null);
+    void persistSortOrder(summaryRef.current);
   }
 
   // 拖曳調整庫存摘要順序:順序存於商品/口味(全店共用),POS 與品項清單同步套用
@@ -243,6 +279,7 @@ export function InventoryDashboard() {
                 return (
                   <tr
                     className={canReorder ? `drag-row ${dragKey === row.itemKey ? "dragging" : ""}` : ""}
+                    data-item-key={row.itemKey}
                     draggable={canReorder}
                     key={`${row.counterName}-${row.itemKey}`}
                     onDragEnd={() => setDragKey(null)}
@@ -259,7 +296,13 @@ export function InventoryDashboard() {
                     <td>{row.counterName}</td>
                     <td>
                       {canReorder ? (
-                        <span aria-hidden className="drag-handle">
+                        <span
+                          aria-hidden
+                          className="drag-handle"
+                          onTouchEnd={handleTouchEnd}
+                          onTouchMove={handleTouchMove}
+                          onTouchStart={() => setDragKey(row.itemKey)}
+                        >
                           ⠿
                         </span>
                       ) : null}

@@ -1,7 +1,7 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import type { FormEvent, TouchEvent as ReactTouchEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CreateInventoryMovementInput, InventoryMovementType } from "@/lib/backend/api-types";
 import { counters as fallbackCounters, products as fallbackProducts } from "@/lib/domain/sample-data";
 import { PurchaseModal } from "@/components/shared/PurchaseModal";
@@ -82,8 +82,9 @@ export function InventoryMovementForm() {
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
-  // 庫存摘要拖曳排序中的列
+  // 庫存摘要拖曳排序中的列;ref 供觸控結束時讀取最新順序
   const [dragKey, setDragKey] = useState<string | null>(null);
+  const summaryRef = useRef<InventorySummary[]>([]);
   const [recordsOpen, setRecordsOpen] = useState(false);
   const [recordSearch, setRecordSearch] = useState("");
   const [recordType, setRecordType] = useState<"all" | InventoryMovementType>("all");
@@ -196,6 +197,40 @@ export function InventoryMovementForm() {
     setMovements(result.data.movements ?? []);
     setSummary(result.data.summary ?? []);
     setStatus(result.data.source === "supabase" ? "已連線本地資料庫" : "Demo 模式");
+  }
+
+  useEffect(() => {
+    summaryRef.current = summary;
+  }, [summary]);
+
+  // 手機觸控:按住 ⠿ 把手上下滑即時換位,放開儲存
+  function handleTouchMove(event: ReactTouchEvent) {
+    if (!dragKey) return;
+
+    const touch = event.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetKey = element?.closest("tr[data-item-key]")?.getAttribute("data-item-key");
+
+    if (!targetKey || targetKey === dragKey) return;
+
+    setSummary((current) => {
+      const rows = [...current];
+      const from = rows.findIndex((row) => row.itemKey === dragKey);
+      const to = rows.findIndex((row) => row.itemKey === targetKey);
+
+      if (from < 0 || to < 0) return current;
+
+      const [moved] = rows.splice(from, 1);
+      rows.splice(to, 0, moved);
+      return rows;
+    });
+  }
+
+  function handleTouchEnd() {
+    if (!dragKey) return;
+
+    setDragKey(null);
+    void persistSortOrder(summaryRef.current);
   }
 
   // 拖曳調整庫存摘要順序:順序存於商品/口味(全店共用),POS 與品項清單同步套用
@@ -450,6 +485,7 @@ export function InventoryMovementForm() {
               {summary.map((row) => (
                 <tr
                   className={`drag-row ${dragKey === row.itemKey ? "dragging" : ""}`}
+                  data-item-key={row.itemKey}
                   draggable
                   key={row.itemKey}
                   onDragEnd={() => setDragKey(null)}
@@ -459,7 +495,13 @@ export function InventoryMovementForm() {
                 >
                   <td>{row.counterName}</td>
                   <td>
-                    <span aria-hidden className="drag-handle">
+                    <span
+                      aria-hidden
+                      className="drag-handle"
+                      onTouchEnd={handleTouchEnd}
+                      onTouchMove={handleTouchMove}
+                      onTouchStart={() => setDragKey(row.itemKey)}
+                    >
                       ⠿
                     </span>
                     {row.itemName}（{row.itemSpec}）

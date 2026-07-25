@@ -1251,9 +1251,13 @@ select:focus-visible {
 
 .drag-handle {
   color: var(--faint);
-  margin-right: 8px;
+  margin-right: 4px;
+  padding: 6px 10px 6px 2px;
+  display: inline-block;
   cursor: grab;
   user-select: none;
+  /* 手機:從把手起手的觸控交給拖曳,不觸發頁面捲動 */
+  touch-action: none;
 }
 
 .inventory-form {
