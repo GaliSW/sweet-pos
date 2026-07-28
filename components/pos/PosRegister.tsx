@@ -52,6 +52,11 @@ function usesOwnStock(product: Product) {
   return product.category === "bag" || product.giftRule?.mode !== "select";
 }
 
+// 設定庫存來源的商品(如蔥餅禮盒)扣來源商品庫存,袋盒共用同一套數字
+function stockKeyFor(product: Product) {
+  return `product:${product.stockSourceProductId ?? product.id}`;
+}
+
 export function PosRegister() {
   const [category, setCategory] = useState<Category>("popular");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -237,7 +242,7 @@ export function PosRegister() {
 
     for (const item of cart) {
       if (usesOwnStock(item.product)) {
-        add(`product:${item.product.id}`, item.quantity);
+        add(stockKeyFor(item.product), item.quantity);
         continue;
       }
 
@@ -316,7 +321,7 @@ export function PosRegister() {
         // 固定口味禮盒扣自身庫存,內容物僅供明細顯示
         const giftFlavors =
           product.giftRule.fixedFlavorItems ?? createGiftFlavorInputs(result.includedItems);
-        const available = availableFor(`product:${product.id}`);
+        const available = availableFor(stockKeyFor(product));
 
         addCartItem(product, result.includedItems, giftFlavors);
 
@@ -327,7 +332,7 @@ export function PosRegister() {
       return;
     }
 
-    const available = availableFor(`product:${product.id}`);
+    const available = availableFor(stockKeyFor(product));
 
     addCartItem(product, [], []);
 
@@ -374,7 +379,7 @@ export function PosRegister() {
     if (delta > 0) {
       const shortage = usesOwnStock(item.product)
         ? (() => {
-            const available = availableFor(`product:${item.product.id}`);
+            const available = availableFor(stockKeyFor(item.product));
             return available != null && available < delta
               ? `${item.product.name} 現貨不足`
               : null;
@@ -476,7 +481,7 @@ export function PosRegister() {
 
     for (const item of cart) {
       if (usesOwnStock(item.product)) {
-        addNeed(`product:${item.product.id}`, item.product.name, item.quantity);
+        addNeed(stockKeyFor(item.product), item.product.name, item.quantity);
         continue;
       }
 
@@ -584,7 +589,7 @@ export function PosRegister() {
           <div className="product-grid">
             {visibleProducts.map((product) => {
               const available = usesOwnStock(product)
-                ? availableFor(`product:${product.id}`)
+                ? availableFor(stockKeyFor(product))
                 : null;
               const soldOut = available != null && available <= 0;
 
@@ -605,7 +610,7 @@ export function PosRegister() {
                     <span>
                       {product.spec}
                       {usesOwnStock(product) && stockByKey
-                        ? `｜庫存 ${stockByKey[`product:${product.id}`] ?? 0}`
+                        ? `｜庫存 ${stockByKey[stockKeyFor(product)] ?? 0}`
                         : ""}
                     </span>
                     <strong className="price">${product.price}</strong>
@@ -873,6 +878,7 @@ type SupabaseCatalog = {
     spec: string;
     price: number | string;
     is_popular?: boolean;
+    stock_source_product_id?: string | null;
   }>;
   giftRules?: Array<{
     product_id: string;
@@ -949,6 +955,7 @@ function mapSupabaseCatalog(data: SupabaseCatalog) {
       spec: product.spec,
       price: Number(product.price),
       popular: Boolean(product.is_popular),
+      stockSourceProductId: product.stock_source_product_id ?? null,
       giftRule: rule
         ? {
             mode: rule.selection_mode,

@@ -15,6 +15,7 @@ type ProductRow = {
   price: number;
   isActive: boolean;
   isPopular: boolean;
+  stockSourceProductId: string | null;
   giftRule: {
     selectionMode: "select" | "fixed";
     requiredFlavorCount: number;
@@ -126,6 +127,7 @@ export function ProductSettings() {
       price: product.price,
       isActive: product.isActive,
       isPopular: product.isPopular,
+      stockSourceProductId: product.stockSourceProductId,
       giftRule: product.giftRule
         ? {
             selectionMode: product.giftRule.selectionMode,
@@ -763,6 +765,33 @@ export function ProductSettings() {
                     </>
                   ) : null}
                 </div>
+              ) : null}
+
+              {productForm.category === "gift_box" &&
+              productForm.giftRule?.selectionMode !== "select" ? (
+                <label className="field">
+                  <span>庫存來源商品（選填：賣出改扣此商品庫存，袋盒共用一套庫存）</span>
+                  <select
+                    value={productForm.stockSourceProductId ?? ""}
+                    onChange={(event) =>
+                      setProductForm({
+                        ...productForm,
+                        stockSourceProductId: event.target.value || null
+                      })
+                    }
+                  >
+                    <option value="">無（禮盒管理自身庫存）</option>
+                    {products
+                      .filter(
+                        (product) => product.category === "bag" && product.id !== productForm.id
+                      )
+                      .map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name}（{product.spec}）
+                        </option>
+                      ))}
+                  </select>
+                </label>
               ) : null}
 
               {productForm.category === "gift_box" &&

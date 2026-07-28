@@ -162,6 +162,8 @@ export type UpsertProductInput = {
   price: number;
   isActive?: boolean;
   isPopular?: boolean;
+  // 庫存來源商品:賣出時改扣此商品庫存(如 9入蔥餅禮盒扣蔥餅袋);僅非自選禮盒適用
+  stockSourceProductId?: string | null;
   giftRule?: {
     selectionMode: "select" | "fixed";
     requiredFlavorCount?: number;

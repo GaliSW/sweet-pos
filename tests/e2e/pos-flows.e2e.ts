@@ -24,6 +24,7 @@ let counterId = "";
 let bundleId = "";
 let sharedOrderId = "";
 let fortuneOrderId = "";
+let e2eBoxProductId = "";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -91,7 +92,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (bundleId) await manager.del("/api/bundles", { id: bundleId });
+  // 先刪櫃位(連同訂單/庫存紀錄),測試商品才能真刪而非停用
   if (counterId) await manager.del("/api/counters", { id: counterId, force: true });
+  if (e2eBoxProductId) await manager.del("/api/products", { id: e2eBoxProductId });
 });
 
 describe("目錄與當班判定", () => {
@@ -305,6 +308,57 @@ describe("庫存:批次進貨 / 交班盤點 / 固定禮盒獨立庫存", () => 
     const reversed = await manager.get(`/api/inventory?counterId=${counterId}`);
     const reversedNames = ((reversed.data as any).summary as any[]).map((row) => row.itemName);
     expect(reversedNames.indexOf("包種烏龍")).toBeLessThan(reversedNames.indexOf("發禮盒"));
+  });
+
+  it("庫存來源商品:蔥餅禮盒賣出扣蔥餅袋庫存,營收歸禮盒", async () => {
+    // 建「E2E蔥餅禮盒」:禮盒類、庫存來源 = 經典原味牛軋餅(袋),袋盒共用庫存
+    const created = await manager.post("/api/products", {
+      category: "gift_box",
+      name: `E2E蔥餅禮盒-${Date.now()}`,
+      spec: "9入/盒",
+      price: 400,
+      isActive: true,
+      stockSourceProductId: SEED.bagCracker,
+      giftRule: null
+    });
+
+    expect(created.ok).toBe(true);
+    e2eBoxProductId = (created.data as any).productId as string;
+    const boxProductId = e2eBoxProductId;
+
+    // 進 3 袋餅乾
+    await staff.post("/api/inventory", {
+      counterId,
+      productId: SEED.bagCracker,
+      movementType: "purchase",
+      quantity: 3
+    });
+    const before = await stockOf("經典原味牛軋餅");
+
+    // 賣 1 盒 → 袋庫存 -1;訂單品項是禮盒(營收歸禮盒)
+    const order = await staff.post("/api/orders", {
+      counterId,
+      discountId: null,
+      paymentMethod: "cash",
+      note: "e2e 庫存來源",
+      items: [{ productId: boxProductId, quantity: 1 }]
+    });
+
+    expect(order.ok).toBe(true);
+    expect(await stockOf("經典原味牛軋餅")).toBe(before - 1);
+
+    const orders = await fetchOrders();
+    const boxOrder = orders.find((entry: any) => entry.note === "e2e 庫存來源");
+    expect(boxOrder.receivedAmount).toBe(400);
+    expect(boxOrder.items[0].productName).toContain("E2E蔥餅禮盒");
+
+    // 作廢應回補「來源商品」的庫存(商品本身於 afterAll 清理)
+    await manager.patch("/api/orders", {
+      orderId: boxOrder.id,
+      action: "void",
+      reason: "e2e 清理"
+    });
+    expect(await stockOf("經典原味牛軋餅")).toBe(before);
   });
 
   it("交班盤點重設庫存基準", async () => {

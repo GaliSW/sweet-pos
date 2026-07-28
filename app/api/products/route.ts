@@ -72,6 +72,7 @@ export async function GET() {
           price: Number(product.price),
           isActive: product.is_active,
           isPopular: Boolean(product.is_popular),
+          stockSourceProductId: product.stock_source_product_id ?? null,
           giftRule: rule
             ? {
                 selectionMode: rule.selection_mode,
@@ -116,7 +117,8 @@ export async function POST(request: Request) {
       spec: input.spec.trim(),
       price: input.price,
       is_active: input.isActive ?? true,
-      is_popular: input.isPopular ?? false
+      is_popular: input.isPopular ?? false,
+      stock_source_product_id: resolveStockSource(input)
     })
     .select("id")
     .single();
@@ -171,7 +173,8 @@ export async function PATCH(request: Request) {
       spec: input.spec.trim(),
       price: input.price,
       is_active: input.isActive ?? true,
-      is_popular: input.isPopular ?? false
+      is_popular: input.isPopular ?? false,
+      stock_source_product_id: resolveStockSource(input)
     })
     .eq("id", input.id)
     .select("id")
@@ -302,6 +305,15 @@ async function upsertGiftRule(
   }
 
   return null;
+}
+
+// 庫存來源僅適用「非自選」禮盒(自選禮盒扣口味庫存),且不可指向自己
+function resolveStockSource(input: UpsertProductInput) {
+  if (input.category !== "gift_box") return null;
+  if (input.giftRule?.selectionMode === "select") return null;
+  if (!input.stockSourceProductId || input.stockSourceProductId === input.id) return null;
+
+  return input.stockSourceProductId;
 }
 
 function validateProductInput(input: UpsertProductInput) {

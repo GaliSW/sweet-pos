@@ -7,6 +7,8 @@ export type Product = {
   spec: string;
   price: number;
   popular?: boolean;
+  // 庫存來源商品:賣出改扣此商品庫存(袋盒共用,如蔥餅禮盒扣蔥餅袋)
+  stockSourceProductId?: string | null;
   giftRule?: {
     mode: "select" | "fixed";
     requiredFlavorCount?: number;

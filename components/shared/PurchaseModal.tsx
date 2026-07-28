@@ -52,8 +52,9 @@ export function PurchaseModal({
     const nextItems: ItemOption[] = [
       ...(data.products ?? [])
         .filter(
-          (product: { id: string; category: string }) =>
-            product.category === "bag" || !selectModeIds.has(product.id)
+          (product: { id: string; category: string; stock_source_product_id?: string | null }) =>
+            !product.stock_source_product_id &&
+            (product.category === "bag" || !selectModeIds.has(product.id))
         )
         .map((product: { id: string; category: string; name: string; spec: string }) => ({
           key: `product:${product.id}`,
