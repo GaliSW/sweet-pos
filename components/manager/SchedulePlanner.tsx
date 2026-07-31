@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ShiftCode, UpsertShiftInput } from "@/lib/backend/api-types";
 import { counters as fallbackCounters, currentShiftStaff } from "@/lib/domain/sample-data";
+import { selectAvailableId } from "@/lib/domain/catalog-selection";
 
 type ScheduleSlot = {
   date: string;
@@ -114,7 +115,12 @@ export function SchedulePlanner() {
     const response = await fetch("/api/catalog");
     const result = await response.json();
 
-    if (!result.ok) return;
+    if (!result.ok) {
+      setCounterId("");
+      setCounters([]);
+      setStatus(result.error ?? "無法載入櫃位資料");
+      return;
+    }
 
     const nextCounters = (result.data.counters ?? fallbackCounters).map((counter: { id: string; name: string }) => ({
       id: counter.id,
@@ -129,7 +135,7 @@ export function SchedulePlanner() {
 
     setCounters(nextCounters);
     setStaffOptions(nextStaff);
-    setCounterId((current) => current || nextCounters[0]?.id || "");
+    setCounterId((current) => selectAvailableId(current, nextCounters));
   }
 
   async function loadShifts() {
@@ -217,6 +223,11 @@ export function SchedulePlanner() {
   }
 
   async function saveSelectedShift(published: boolean) {
+    if (!counterId || !counters.some((counter) => counter.id === counterId)) {
+      setStatus("請先選擇有效的櫃位");
+      return;
+    }
+
     setSaving(true);
     setStatus("儲存班次中...");
 
@@ -276,6 +287,11 @@ export function SchedulePlanner() {
   }
 
   async function publishMonth() {
+    if (!counterId || !counters.some((counter) => counter.id === counterId)) {
+      setStatus("請先選擇有效的櫃位");
+      return;
+    }
+
     setSaving(true);
     setStatus("檢查衝突並發布中...");
 

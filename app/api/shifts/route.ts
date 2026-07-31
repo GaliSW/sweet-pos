@@ -95,6 +95,23 @@ export async function POST(request: Request) {
 
   const supabase = createSupabaseAdminClient();
 
+  const { data: counter, error: counterError } = await supabase
+    .from("counters")
+    .select("id")
+    .eq("id", input.counterId)
+    .maybeSingle();
+
+  if (counterError) {
+    return NextResponse.json({ ok: false, error: counterError.message }, { status: 500 });
+  }
+
+  if (!counter) {
+    return NextResponse.json(
+      { ok: false, error: "所選櫃位不存在或已被刪除，請重新整理後再選擇櫃位" },
+      { status: 400 }
+    );
+  }
+
   // 共班:同班段最多 2 人。以「刪除該班段全部列、重建每人一列」取代 upsert。
   const staffIds = Array.from(
     new Set(
