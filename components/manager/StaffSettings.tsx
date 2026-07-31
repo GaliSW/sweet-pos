@@ -8,7 +8,9 @@ type StaffRow = {
   email: string;
   displayName: string;
   role: "staff" | "manager";
+  salaryType: "hourly" | "monthly";
   hourlyWage: number;
+  monthlySalary: number;
   isActive: boolean;
 };
 
@@ -17,7 +19,9 @@ const emptyStaff: UpsertStaffInput = {
   password: "",
   displayName: "",
   role: "staff",
+  salaryType: "hourly",
   hourlyWage: 190,
+  monthlySalary: 0,
   isActive: true
 };
 
@@ -51,7 +55,9 @@ export function StaffSettings() {
       password: "",
       displayName: row.displayName,
       role: row.role,
+      salaryType: row.salaryType,
       hourlyWage: row.hourlyWage,
+      monthlySalary: row.monthlySalary,
       isActive: row.isActive
     });
   }
@@ -117,7 +123,7 @@ export function StaffSettings() {
       <section className="section-title">
         <div>
           <h1>員工管理</h1>
-          <p>新增員工帳號、設定角色與時薪，刪除或停用離職員工。</p>
+          <p>新增員工帳號、設定角色與時薪或月薪，刪除或停用離職員工。</p>
         </div>
         <span className="pill">{status}</span>
       </section>
@@ -132,7 +138,7 @@ export function StaffSettings() {
                   <th>姓名</th>
                   <th>Email</th>
                   <th>角色</th>
-                  <th>時薪</th>
+                  <th>薪資設定</th>
                   <th>狀態</th>
                   <th />
                 </tr>
@@ -143,7 +149,11 @@ export function StaffSettings() {
                     <td>{row.displayName}</td>
                     <td>{row.email || "—"}</td>
                     <td>{row.role === "manager" ? "店長" : "員工"}</td>
-                    <td>${row.hourlyWage}</td>
+                    <td>
+                      {row.salaryType === "monthly"
+                        ? `月薪 $${row.monthlySalary.toLocaleString("en-US")}`
+                        : `時薪 $${row.hourlyWage.toLocaleString("en-US")}`}
+                    </td>
                     <td>{row.isActive ? "啟用" : "停用"}</td>
                     <td>
                       <div className="toolbar">
@@ -208,12 +218,35 @@ export function StaffSettings() {
               </select>
             </label>
             <label className="field">
-              <span>時薪</span>
+              <span>薪資類型</span>
+              <select
+                value={form.salaryType}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    salaryType: event.target.value as "hourly" | "monthly"
+                  })
+                }
+              >
+                <option value="hourly">時薪</option>
+                <option value="monthly">月薪</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>{form.salaryType === "monthly" ? "月薪" : "時薪"}</span>
               <input
                 type="number"
                 min={0}
-                value={form.hourlyWage || ""}
-                onChange={(event) => setForm({ ...form, hourlyWage: Number(event.target.value) })}
+                value={
+                  form.salaryType === "monthly"
+                    ? form.monthlySalary || ""
+                    : form.hourlyWage || ""
+                }
+                onChange={(event) =>
+                  form.salaryType === "monthly"
+                    ? setForm({ ...form, monthlySalary: Number(event.target.value) })
+                    : setForm({ ...form, hourlyWage: Number(event.target.value) })
+                }
               />
             </label>
             <label className="field">

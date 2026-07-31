@@ -24,6 +24,19 @@ export type OrderTotals = {
   receivedAmount: number;
 };
 
+export function calculateBasePay(input: {
+  salaryType: "hourly" | "monthly";
+  scheduledHours: number;
+  hourlyWage: number;
+  monthlySalary: number;
+}) {
+  return Math.round(
+    input.salaryType === "monthly"
+      ? input.monthlySalary
+      : input.scheduledHours * input.hourlyWage
+  );
+}
+
 export function calculateOrderTotals(input: {
   items: OrderLineInput[];
   discount?: Discount | null;

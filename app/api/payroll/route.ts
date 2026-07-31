@@ -9,7 +9,7 @@ import {
 import { requireRole } from "@/lib/auth/guards";
 import { fetchCommissionTierSets, resolveTiers } from "@/lib/backend/commission";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
-import { calculateCommissionByTiers } from "@/lib/domain/pos-rules";
+import { calculateBasePay, calculateCommissionByTiers } from "@/lib/domain/pos-rules";
 
 export async function GET(request: Request) {
   const guard = await requireRole("manager");
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
     ordersQuery,
     supabase
       .from("profiles")
-      .select("id, display_name, hourly_wage, commission_mode")
+      .select("id, display_name, salary_type, hourly_wage, monthly_salary, commission_mode, is_active")
       .eq("role", "staff"),
     fetchCommissionTierSets(supabase)
   ]);
@@ -77,8 +77,11 @@ export async function GET(request: Request) {
       profile.id as string,
       {
         name: profile.display_name as string,
+        salaryType: (profile.salary_type as "hourly" | "monthly") ?? "hourly",
         hourlyWage: Number(profile.hourly_wage),
-        commissionMode: (profile.commission_mode as "daily" | "monthly") ?? "daily"
+        monthlySalary: Number(profile.monthly_salary ?? 0),
+        commissionMode: (profile.commission_mode as "daily" | "monthly") ?? "daily",
+        isActive: Boolean(profile.is_active)
       }
     ])
   );
@@ -94,7 +97,9 @@ export async function GET(request: Request) {
     const row: PayrollRow = {
       staffId,
       staffName: profile?.name ?? "未命名員工",
+      salaryType: profile?.salaryType ?? "hourly",
       hourlyWage: profile?.hourlyWage ?? 0,
+      monthlySalary: profile?.monthlySalary ?? 0,
       shiftCount: 0,
       scheduledHours: 0,
       basePay: 0,
@@ -104,6 +109,11 @@ export async function GET(request: Request) {
 
     rows.set(staffId, row);
     return row;
+  }
+
+  // 在職月薪員工即使當月沒有排班或業績，也必須列入薪資試算。
+  for (const [staffId, profile] of profileById) {
+    if (profile.salaryType === "monthly" && profile.isActive) rowFor(staffId);
   }
 
   for (const shift of shiftsResult.data ?? []) {
@@ -152,7 +162,12 @@ export async function GET(request: Request) {
   const payroll = Array.from(rows.values())
     .map((row) => {
       const scheduledHours = Number(row.scheduledHours.toFixed(1));
-      const basePay = Math.round(scheduledHours * row.hourlyWage);
+      const basePay = calculateBasePay({
+        salaryType: row.salaryType,
+        scheduledHours,
+        hourlyWage: row.hourlyWage,
+        monthlySalary: row.monthlySalary
+      });
 
       return {
         ...row,
@@ -178,17 +193,21 @@ function buildDemoPayroll(): PayrollRow[] {
     {
       staffId: "00000000-0000-4000-8000-000000000001",
       staffName: "林小芸",
+      salaryType: "monthly",
       hourlyWage: 190,
+      monthlySalary: 36000,
       shiftCount: 12,
       scheduledHours: 72,
-      basePay: 13680,
+      basePay: 36000,
       commission: 1830,
-      estimatedTotal: 15510
+      estimatedTotal: 37830
     },
     {
       staffId: "00000000-0000-4000-8000-000000000002",
       staffName: "陳柏宇",
+      salaryType: "hourly",
       hourlyWage: 190,
+      monthlySalary: 0,
       shiftCount: 11,
       scheduledHours: 66,
       basePay: 12540,
@@ -198,7 +217,9 @@ function buildDemoPayroll(): PayrollRow[] {
     {
       staffId: "00000000-0000-4000-8000-000000000003",
       staffName: "黃品安",
+      salaryType: "hourly",
       hourlyWage: 200,
+      monthlySalary: 0,
       shiftCount: 12,
       scheduledHours: 72,
       basePay: 14400,

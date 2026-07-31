@@ -2,12 +2,37 @@ import { describe, expect, it } from "vitest";
 import {
   calculateBundleDiscount,
   calculateCommissionByTiers,
+  calculateBasePay,
   calculateDailyCommission,
   calculateOrderTotals,
   defaultCommissionTiers,
   detectShiftConflicts,
   validateGiftBoxSelection
 } from "@/lib/domain/pos-rules";
+
+describe("calculateBasePay", () => {
+  it("uses scheduled hours for hourly staff", () => {
+    expect(
+      calculateBasePay({
+        salaryType: "hourly",
+        scheduledHours: 72,
+        hourlyWage: 190,
+        monthlySalary: 0
+      })
+    ).toBe(13680);
+  });
+
+  it("uses the configured monthly salary regardless of scheduled hours", () => {
+    expect(
+      calculateBasePay({
+        salaryType: "monthly",
+        scheduledHours: 0,
+        hourlyWage: 190,
+        monthlySalary: 36000
+      })
+    ).toBe(36000);
+  });
+});
 
 describe("calculateOrderTotals", () => {
   it("sets received amount equal to receivable amount after discount", () => {

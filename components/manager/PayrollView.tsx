@@ -174,7 +174,7 @@ export function PayrollView() {
       <section className="section-title">
         <div>
           <h1>薪資試算</h1>
-          <p>依排班時數與時薪計算底薪，依每日個人業績計算抽成。</p>
+          <p>時薪制依排班時數計薪，月薪制採設定月薪；抽成依個人業績另計。</p>
         </div>
         <div className="toolbar">
           <label className="field compact">
@@ -194,7 +194,7 @@ export function PayrollView() {
                 <th>員工</th>
                 <th>班數</th>
                 <th>時數</th>
-                <th>時薪</th>
+                <th>薪資設定</th>
                 <th>底薪</th>
                 <th>抽成</th>
                 <th>預估合計</th>
@@ -206,7 +206,11 @@ export function PayrollView() {
                   <td>{row.staffName}</td>
                   <td>{row.shiftCount}</td>
                   <td>{row.scheduledHours}h</td>
-                  <td>${row.hourlyWage}</td>
+                  <td>
+                    {row.salaryType === "monthly"
+                      ? `月薪 ${formatCurrency(row.monthlySalary)}`
+                      : `時薪 $${row.hourlyWage}`}
+                  </td>
                   <td>{formatCurrency(row.basePay)}</td>
                   <td>{formatCurrency(row.commission)}</td>
                   <td>{formatCurrency(row.estimatedTotal)}</td>

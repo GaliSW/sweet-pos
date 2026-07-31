@@ -18,7 +18,9 @@ export async function GET() {
           email: `staff-${String.fromCharCode(97 + index)}@example.local`,
           displayName: staff.name,
           role: "staff",
+          salaryType: index === 0 ? "monthly" : "hourly",
           hourlyWage: 190,
+          monthlySalary: index === 0 ? 36000 : 0,
           isActive: true
         })),
         source: "demo"
@@ -48,7 +50,9 @@ export async function GET() {
         email: emailById.get(profile.id as string) ?? "",
         displayName: profile.display_name,
         role: profile.role,
+        salaryType: profile.salary_type ?? "hourly",
         hourlyWage: Number(profile.hourly_wage),
+        monthlySalary: Number(profile.monthly_salary ?? 0),
         isActive: profile.is_active
       })),
       source: "supabase"
@@ -94,7 +98,9 @@ export async function POST(request: Request) {
     id: created.user.id,
     display_name: input.displayName.trim(),
     role: input.role,
+    salary_type: input.salaryType ?? "hourly",
     hourly_wage: input.hourlyWage,
+    monthly_salary: input.monthlySalary ?? 0,
     is_active: input.isActive ?? true
   });
 
@@ -143,7 +149,9 @@ export async function PATCH(request: Request) {
     .update({
       display_name: input.displayName.trim(),
       role: input.role,
+      salary_type: input.salaryType ?? "hourly",
       hourly_wage: input.hourlyWage,
+      monthly_salary: input.monthlySalary ?? 0,
       is_active: input.isActive ?? true
     })
     .eq("id", input.id)
@@ -264,8 +272,21 @@ function validateStaffInput(
   if (input.role !== "staff" && input.role !== "manager") {
     return { ok: false as const, error: "角色必須是員工或店長" };
   }
+  const salaryType = input.salaryType ?? "hourly";
+  if (salaryType !== "hourly" && salaryType !== "monthly") {
+    return { ok: false as const, error: "薪資類型必須是時薪或月薪" };
+  }
   if (!Number.isFinite(Number(input.hourlyWage)) || Number(input.hourlyWage) < 0) {
     return { ok: false as const, error: "時薪不可為負數" };
+  }
+  if (!Number.isFinite(Number(input.monthlySalary ?? 0)) || Number(input.monthlySalary ?? 0) < 0) {
+    return { ok: false as const, error: "月薪不可為負數" };
+  }
+  if (input.role === "staff" && salaryType === "hourly" && Number(input.hourlyWage) <= 0) {
+    return { ok: false as const, error: "時薪制員工的時薪必須大於 0" };
+  }
+  if (input.role === "staff" && salaryType === "monthly" && Number(input.monthlySalary ?? 0) <= 0) {
+    return { ok: false as const, error: "月薪制員工的月薪必須大於 0" };
   }
 
   if (options.requireCredentials) {

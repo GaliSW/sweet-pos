@@ -146,7 +146,9 @@ export type CounterTargetRow = {
 export type PayrollRow = {
   staffId: string;
   staffName: string;
+  salaryType: "hourly" | "monthly";
   hourlyWage: number;
+  monthlySalary: number;
   shiftCount: number;
   scheduledHours: number;
   basePay: number;
@@ -196,7 +198,9 @@ export type UpsertStaffInput = {
   password?: string;
   displayName: string;
   role: "staff" | "manager";
+  salaryType: "hourly" | "monthly";
   hourlyWage: number;
+  monthlySalary: number;
   isActive?: boolean;
 };
 
