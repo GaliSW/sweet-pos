@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  defaultPaymentMethods,
+  type PaymentMethodOption
+} from "@/lib/domain/payment-methods";
 
 type CounterOption = {
   id: string;
@@ -106,14 +110,6 @@ type BackfillDraft = {
 
 const crackerName = "經典原味蔥軋餅";
 
-const paymentOptions = [
-  { value: "cash", label: "現金" },
-  { value: "credit_card", label: "信用卡" },
-  { value: "line_pay", label: "LINE Pay" },
-  { value: "jkopay", label: "街口支付" },
-  { value: "transfer", label: "轉帳" }
-];
-
 export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
   const today = new Date().toISOString().slice(0, 10);
   // 員工預設看「今天」(合計即當日總額);店長預設看整月
@@ -124,6 +120,7 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
   const [counters, setCounters] = useState<CounterOption[]>([]);
   const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
   const [discountOptions, setDiscountOptions] = useState<DiscountOption[]>([]);
+  const [paymentOptions, setPaymentOptions] = useState<PaymentMethodOption[]>(defaultPaymentMethods);
   const [bagProducts, setBagProducts] = useState<Array<{ id: string; name: string }>>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [detailOrder, setDetailOrder] = useState<OrderRow | null>(null);
@@ -188,6 +185,7 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
     if (!result?.ok) return;
 
     setCounters(result.data.counters ?? []);
+    setPaymentOptions(result.data.paymentMethods ?? defaultPaymentMethods);
     setStaffOptions(
       (result.data.staff ?? []).map((staff: { id: string; display_name?: string; name?: string }) => ({
         id: staff.id,
@@ -787,9 +785,9 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
                     setEditDraft({ ...editDraft, paymentMethod: event.target.value })
                   }
                 >
-                  {paymentOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                  {paymentOptionsFor(editDraft.paymentMethod, paymentOptions, orders).map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.name}
                     </option>
                   ))}
                 </select>
@@ -1031,8 +1029,8 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
                   }
                 >
                   {paymentOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                    <option key={option.code} value={option.code}>
+                      {option.name}
                     </option>
                   ))}
                 </select>
@@ -1178,6 +1176,19 @@ export function OrdersExplorer({ variant }: { variant: "manager" | "staff" }) {
       ) : null}
     </>
   );
+}
+
+function paymentOptionsFor(
+  currentCode: string,
+  activeOptions: PaymentMethodOption[],
+  orders: OrderRow[]
+) {
+  if (activeOptions.some((option) => option.code === currentCode)) return activeOptions;
+  const historicalName = orders.find((order) => order.paymentMethod === currentCode)?.paymentLabel;
+  return [
+    { code: currentCode, name: historicalName ?? currentCode, isActive: false, sortOrder: -1 },
+    ...activeOptions
+  ];
 }
 
 function toDatetimeLocal(value: string) {

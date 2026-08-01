@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/guards";
 import { relationDisplayName, relationName } from "@/lib/backend/query-helpers";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
+import { resolvePaymentLabel } from "@/lib/domain/payment-methods";
 
 // 匯出指定櫃位的全部歷史紀錄(訂單/品項/班表/庫存異動),
 // 供「永久刪除櫃位」前先下載備份。
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
-  const [ordersResult, shiftsResult, movementsResult] = await Promise.all([
+  const [ordersResult, shiftsResult, movementsResult, paymentMethodsResult] = await Promise.all([
     supabase
       .from("orders")
       .select(
@@ -44,10 +45,15 @@ export async function GET(request: Request) {
         "created_at, movement_type, quantity, counted_quantity, note, products(name), flavors(name), created_profile:profiles!inventory_movements_created_by_fkey(display_name)"
       )
       .eq("counter_id", counterId)
-      .order("created_at")
+      .order("created_at"),
+    supabase.from("payment_methods").select("code, name")
   ]);
 
-  const error = ordersResult.error ?? shiftsResult.error ?? movementsResult.error;
+  const error =
+    ordersResult.error ??
+    shiftsResult.error ??
+    movementsResult.error ??
+    paymentMethodsResult.error;
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -95,6 +101,10 @@ export async function GET(request: Request) {
         sellerName: relationDisplayName(order.seller),
         seller2Name: relationDisplayName(order.seller2),
         paymentMethod: order.payment_method,
+        paymentLabel: resolvePaymentLabel(
+          order.payment_method as string,
+          paymentMethodsResult.data ?? []
+        ),
         salesAmount: Number(order.sales_amount),
         bundleDiscountAmount: Number(order.bundle_discount_amount ?? 0),
         discountAmount: Number(order.discount_amount),

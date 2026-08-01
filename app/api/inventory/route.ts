@@ -24,7 +24,7 @@ const movementLabels: Record<InventoryMovementType, string> = {
   purchase: "進貨",
   sampling: "試吃",
   waste: "報廢",
-  adjustment: "調整",
+  adjustment: "轉調",
   sale: "銷售"
 };
 
@@ -290,7 +290,7 @@ export async function PATCH(request: Request) {
 
   if (noteRequiredTypes.has(input.movementType) && !input.note?.trim()) {
     return NextResponse.json(
-      { ok: false, error: "試吃、報廢與調整需要填寫原因 / 備註" },
+      { ok: false, error: "試吃、報廢與轉調需要填寫原因 / 備註" },
       { status: 400 }
     );
   }
@@ -399,7 +399,7 @@ function validateInventoryInput(input: CreateInventoryMovementInput) {
     return { ok: false as const, error: "盤點類異動需要填實際盤點庫存" };
   }
   if (noteRequiredTypes.has(input.movementType) && !input.note?.trim()) {
-    return { ok: false as const, error: "試吃、報廢與調整需要填寫原因 / 備註" };
+    return { ok: false as const, error: "試吃、報廢與轉調需要填寫原因 / 備註" };
   }
 
   return { ok: true as const };

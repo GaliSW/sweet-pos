@@ -18,7 +18,7 @@ export type CreateOrderInput = {
   seller2Id?: string | null;
   cashierId?: string;
   discountId: string | null;
-  paymentMethod: "cash" | "credit_card" | "line_pay" | "jkopay" | "transfer";
+  paymentMethod: string;
   // 手動扣款(臨時活動)與備註
   manualDiscount?: number;
   note?: string;
@@ -213,4 +213,11 @@ export type UpsertCounterInput = {
     month: string;
     targetAmount: number;
   } | null;
+};
+
+export type UpsertPaymentMethodInput = {
+  code?: string;
+  name: string;
+  isActive?: boolean;
+  sortOrder?: number;
 };

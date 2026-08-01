@@ -16,6 +16,11 @@ import {
   type BundleDefinition
 } from "@/lib/domain/pos-rules";
 import { COUNTER_CHANGED_EVENT, getSelectedCounterId } from "@/lib/shared/counter-preference";
+import {
+  defaultPaymentMethods,
+  resolvePaymentLabel,
+  type PaymentMethodOption
+} from "@/lib/domain/payment-methods";
 
 type Category = "popular" | "bag" | "gift_box";
 
@@ -62,6 +67,7 @@ export function PosRegister() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedDiscountId, setSelectedDiscountId] = useState("none");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodOption[]>(defaultPaymentMethods);
   // 手動扣款(臨時活動,如滿千送品項)與備註
   const [manualDiscount, setManualDiscount] = useState("");
   const [orderNote, setOrderNote] = useState("");
@@ -177,6 +183,12 @@ export function PosRegister() {
       setDiscounts(mapped.discounts);
       setFlavors(mapped.flavors);
       setBundles(mapped.bundles);
+      setPaymentMethods(mapped.paymentMethods);
+      setPaymentMethod((current) =>
+        mapped.paymentMethods.some((method) => method.code === current)
+          ? current
+          : mapped.paymentMethods[0]?.code ?? ""
+      );
       setCounters(mapped.counters);
       setCounterId((current) =>
         mapped.counters.some((counter) => counter.id === current)
@@ -549,7 +561,7 @@ export function PosRegister() {
         (result.data.sellers as string[] | undefined)?.join("、") || "記在你名下";
 
       setNotice(
-        `訂單完成：${sellerLabel} / ${paymentLabel(paymentMethod)} / 應收 $${totals.receivableAmount}`
+        `訂單完成：${sellerLabel} / ${resolvePaymentLabel(paymentMethod, paymentMethods)} / 應收 $${totals.receivableAmount}`
       );
       setCart([]);
       setManualDiscount("");
@@ -692,11 +704,11 @@ export function PosRegister() {
                   value={paymentMethod}
                   onChange={(event) => setPaymentMethod(event.target.value)}
                 >
-                  <option value="cash">現金</option>
-                  <option value="credit_card">信用卡</option>
-                  <option value="line_pay">LINE Pay</option>
-                  <option value="jkopay">街口支付</option>
-                  <option value="transfer">轉帳</option>
+                  {paymentMethods.map((method) => (
+                    <option key={method.code} value={method.code}>
+                      {method.name}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
@@ -904,6 +916,7 @@ type SupabaseCatalog = {
     min_order_amount: number | string | null;
   }>;
   counters: Array<{ id: string; name: string }>;
+  paymentMethods?: PaymentMethodOption[];
 };
 
 function mapSupabaseCatalog(data: SupabaseCatalog) {
@@ -994,7 +1007,8 @@ function mapSupabaseCatalog(data: SupabaseCatalog) {
       id: staff.id,
       name: staff.display_name ?? staff.name ?? "未命名員工"
     })),
-    counters: data.counters.map((counter) => ({ id: counter.id, name: counter.name }))
+    counters: data.counters.map((counter) => ({ id: counter.id, name: counter.name })),
+    paymentMethods: data.paymentMethods ?? defaultPaymentMethods
   };
 }
 
@@ -1070,16 +1084,4 @@ function describeRule(product: Product) {
   }
 
   return "單品計價";
-}
-
-function paymentLabel(method: string) {
-  const labels: Record<string, string> = {
-    cash: "現金",
-    credit_card: "信用卡",
-    line_pay: "LINE Pay",
-    jkopay: "街口支付",
-    transfer: "轉帳"
-  };
-
-  return labels[method] ?? method;
 }

@@ -14,5 +14,6 @@ export const managerNavLinks = [
   { href: "/manager/inventory", label: "庫存" },
   { href: "/manager/products", label: "商品" },
   { href: "/manager/counters", label: "櫃位" },
+  { href: "/manager/payment-methods", label: "付款" },
   { href: "/manager/staff", label: "員工" }
 ] as const;

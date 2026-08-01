@@ -13,16 +13,9 @@ import {
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 import { discounts, products } from "@/lib/domain/sample-data";
 import { calculateOrderTotals, validateGiftBoxSelection } from "@/lib/domain/pos-rules";
+import { resolvePaymentLabel } from "@/lib/domain/payment-methods";
 
 const defaultCashierId = "00000000-0000-4000-8000-000000000001";
-
-const paymentLabels: Record<string, string> = {
-  cash: "現金",
-  credit_card: "信用卡",
-  line_pay: "LINE Pay",
-  jkopay: "街口支付",
-  transfer: "轉帳"
-};
 
 export async function GET(request: Request) {
   // 店長看全部;一般員工只看得到自己經手(收銀或銷售)的訂單。
@@ -45,6 +38,13 @@ export async function GET(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const { data: paymentMethods, error: paymentMethodsError } = await supabase
+    .from("payment_methods")
+    .select("code, name");
+
+  if (paymentMethodsError) {
+    return NextResponse.json({ ok: false, error: paymentMethodsError.message }, { status: 500 });
+  }
 
   let query = supabase
     .from("orders")
@@ -160,7 +160,7 @@ export async function GET(request: Request) {
         cashierName: relationDisplayName(order.cashier),
         discountId: order.discount_id,
         paymentMethod: order.payment_method,
-        paymentLabel: paymentLabels[order.payment_method as string] ?? order.payment_method,
+        paymentLabel: resolvePaymentLabel(order.payment_method as string, paymentMethods ?? []),
         salesAmount: Number(order.sales_amount),
         bundleDiscountAmount: Number(order.bundle_discount_amount ?? 0),
         discountAmount: Number(order.discount_amount),

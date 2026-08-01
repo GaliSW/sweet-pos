@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/guards";
 import { counters, currentShiftStaff, discounts, flavors, products } from "@/lib/domain/sample-data";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
+import { defaultPaymentMethods } from "@/lib/domain/payment-methods";
 
 export async function GET() {
   const guard = await requireRole();
@@ -17,6 +18,7 @@ export async function GET() {
         flavors,
         staff: currentShiftStaff,
         counters,
+        paymentMethods: defaultPaymentMethods,
         source: "demo"
       }
     });
@@ -33,7 +35,8 @@ export async function GET() {
     giftRulesResult,
     fixedFlavorsResult,
     allowedFlavorsResult,
-    bundlesResult
+    bundlesResult,
+    paymentMethodsResult
   ] = await Promise.all([
     // 依自訂排序(庫存列表拖曳設定,未設定者排後面)再依名稱
     supabase
@@ -64,7 +67,12 @@ export async function GET() {
     supabase
       .from("bundles")
       .select("id, name, is_active, bundle_products(product_id), bundle_tiers(quantity, price)")
+      .eq("is_active", true),
+    supabase
+      .from("payment_methods")
+      .select("code, name, is_active, sort_order")
       .eq("is_active", true)
+      .order("sort_order")
   ]);
 
   const error =
@@ -76,7 +84,8 @@ export async function GET() {
     giftRulesResult.error ??
     fixedFlavorsResult.error ??
     allowedFlavorsResult.error ??
-    bundlesResult.error;
+    bundlesResult.error ??
+    paymentMethodsResult.error;
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -93,6 +102,12 @@ export async function GET() {
       giftRules: giftRulesResult.data,
       fixedFlavors: fixedFlavorsResult.data,
       allowedFlavors: allowedFlavorsResult.data,
+      paymentMethods: (paymentMethodsResult.data ?? []).map((method) => ({
+        code: method.code,
+        name: method.name,
+        isActive: method.is_active,
+        sortOrder: method.sort_order
+      })),
       bundles: (bundlesResult.data ?? []).map((bundle) => ({
         id: bundle.id,
         name: bundle.name,

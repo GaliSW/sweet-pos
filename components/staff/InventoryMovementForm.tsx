@@ -48,7 +48,7 @@ const movementOptions: Array<{ value: InventoryMovementType; label: string }> = 
   { value: "purchase", label: "進貨" },
   { value: "sampling", label: "試吃" },
   { value: "waste", label: "報廢" },
-  { value: "adjustment", label: "調整" }
+  { value: "adjustment", label: "轉調" }
 ];
 
 const countTypes = new Set<InventoryMovementType>([

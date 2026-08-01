@@ -145,6 +145,7 @@ export function CounterSettings() {
       sellerName: string;
       seller2Name: string;
       paymentMethod: string;
+      paymentLabel: string;
       salesAmount: number;
       bundleDiscountAmount: number;
       discountAmount: number;
@@ -184,7 +185,7 @@ export function CounterSettings() {
         單號: order.orderNo,
         時間: order.createdAt,
         銷售: order.sellerName + (order.seller2Name ? `、${order.seller2Name}` : ""),
-        付款: order.paymentMethod,
+        付款: order.paymentLabel,
         銷售金額: order.salesAmount,
         組合折抵: order.bundleDiscountAmount,
         折扣金額: order.discountAmount,
