@@ -7,6 +7,7 @@ import type {
 import { requireRole } from "@/lib/auth/guards";
 import { relationDisplayName } from "@/lib/backend/query-helpers";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
+import { normalizeInventoryQuantity } from "@/lib/domain/inventory";
 
 const defaultStaffId = "00000000-0000-4000-8000-000000000001";
 const countTypes = new Set<InventoryMovementType>([
@@ -14,7 +15,6 @@ const countTypes = new Set<InventoryMovementType>([
   "closing_count",
   "handover_count"
 ]);
-const deductionTypes = new Set<InventoryMovementType>(["sampling", "waste", "sale"]);
 const noteRequiredTypes = new Set<InventoryMovementType>(["sampling", "waste", "adjustment"]);
 
 const movementLabels: Record<InventoryMovementType, string> = {
@@ -219,7 +219,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
-  const normalizedQuantity = normalizeQuantity(input.movementType, input.quantity);
+  const normalizedQuantity = normalizeInventoryQuantity(input.movementType, input.quantity);
 
   const { data, error } = await supabase
     .from("inventory_movements")
@@ -326,7 +326,7 @@ export async function PATCH(request: Request) {
     .from("inventory_movements")
     .update({
       movement_type: input.movementType,
-      quantity: normalizeQuantity(input.movementType, Number(input.quantity)),
+      quantity: normalizeInventoryQuantity(input.movementType, Number(input.quantity)),
       counted_quantity: input.countedQuantity ?? null,
       note: input.note?.trim() || null,
       updated_by: guard.profile?.id ?? null,
@@ -430,12 +430,6 @@ function validateInventoryInput(input: CreateInventoryMovementInput) {
   }
 
   return { ok: true as const };
-}
-
-function normalizeQuantity(type: InventoryMovementType, quantity: number) {
-  if (countTypes.has(type)) return 0;
-  if (deductionTypes.has(type)) return -Math.abs(Number(quantity));
-  return Math.abs(Number(quantity));
 }
 
 function relationName(value: unknown) {
