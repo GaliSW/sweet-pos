@@ -31,6 +31,17 @@ const movementLabels: Record<InventoryMovementType, string> = {
 const movementSelect =
   "id, counter_id, product_id, flavor_id, movement_type, quantity, counted_quantity, note, created_by, created_at, updated_at, reviewed_at, counters(name), products(name, spec, sort_order), flavors(name, spec, sort_order), created_profile:profiles!inventory_movements_created_by_fkey(display_name), updated_profile:profiles!inventory_movements_updated_by_fkey(display_name), reviewed_profile:profiles!inventory_movements_reviewed_by_fkey(display_name)";
 
+type InventorySummaryRow = {
+  counter_id: string;
+  counter_name: string;
+  product_id: string | null;
+  flavor_id: string | null;
+  item_name: string;
+  item_spec: string;
+  item_sort_order: number | null;
+  stock: number;
+};
+
 export async function GET(request: Request) {
   const guard = await requireRole();
 
@@ -62,13 +73,19 @@ export async function GET(request: Request) {
     query = query.eq("counter_id", counterId);
   }
 
-  const { data, error } = await query;
+  const [movementResult, summaryResult] = await Promise.all([
+    query,
+    supabase.rpc("inventory_stock_summary", { p_counter_id: counterId || null })
+  ]);
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (movementResult.error || summaryResult.error) {
+    return NextResponse.json(
+      { ok: false, error: movementResult.error?.message ?? summaryResult.error?.message },
+      { status: 500 }
+    );
   }
 
-  const movements = (data ?? []).map((movement) => {
+  const movements = (movementResult.data ?? []).map((movement) => {
     const isFlavor = Boolean(movement.flavor_id);
 
     return {
@@ -100,7 +117,17 @@ export async function GET(request: Request) {
     ok: true,
     data: {
       movements,
-      summary: buildInventorySummary(movements),
+      summary: ((summaryResult.data ?? []) as InventorySummaryRow[]).map((row) => ({
+        counterId: row.counter_id,
+        counterName: row.counter_name,
+        itemKey: row.flavor_id ? `flavor:${row.flavor_id}` : `product:${row.product_id}`,
+        productId: row.product_id,
+        flavorId: row.flavor_id,
+        itemName: row.item_name,
+        itemSpec: row.item_spec,
+        itemSortOrder: row.item_sort_order,
+        stock: row.stock
+      })),
       source: "supabase"
     }
   });
@@ -409,68 +436,6 @@ function normalizeQuantity(type: InventoryMovementType, quantity: number) {
   if (countTypes.has(type)) return 0;
   if (deductionTypes.has(type)) return -Math.abs(Number(quantity));
   return Math.abs(Number(quantity));
-}
-
-function buildInventorySummary(
-  movements: Array<{
-    counterId: string;
-    counterName: string;
-    itemKey: string;
-    productId: string | null;
-    flavorId: string | null;
-    itemName: string;
-    itemSpec: string;
-    itemSortOrder: number | null;
-    quantity: number;
-    countedQuantity: number | null;
-  }>
-) {
-  const sorted = [...movements].reverse();
-  const summary = new Map<
-    string,
-    {
-      counterId: string;
-      counterName: string;
-      itemKey: string;
-      productId: string | null;
-      flavorId: string | null;
-      itemName: string;
-      itemSpec: string;
-      itemSortOrder: number | null;
-      stock: number;
-    }
-  >();
-
-  for (const movement of sorted) {
-    const key = `${movement.counterId}-${movement.itemKey}`;
-    const current =
-      summary.get(key) ??
-      {
-        counterId: movement.counterId,
-        counterName: movement.counterName,
-        itemKey: movement.itemKey,
-        productId: movement.productId,
-        flavorId: movement.flavorId,
-        itemName: movement.itemName,
-        itemSpec: movement.itemSpec,
-        itemSortOrder: movement.itemSortOrder,
-        stock: 0
-      };
-
-    summary.set(key, {
-      ...current,
-      stock: movement.countedQuantity ?? current.stock + movement.quantity
-    });
-  }
-
-  // 同櫃位內依自訂排序(未設定者排後面),再依名稱
-  return Array.from(summary.values()).sort(
-    (left, right) =>
-      left.counterName.localeCompare(right.counterName) ||
-      (left.itemSortOrder ?? Number.MAX_SAFE_INTEGER) -
-        (right.itemSortOrder ?? Number.MAX_SAFE_INTEGER) ||
-      left.itemName.localeCompare(right.itemName)
-  );
 }
 
 function relationName(value: unknown) {
