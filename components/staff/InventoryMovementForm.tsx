@@ -48,7 +48,8 @@ const movementOptions: Array<{ value: InventoryMovementType; label: string }> = 
   { value: "purchase", label: "進貨" },
   { value: "sampling", label: "試吃" },
   { value: "waste", label: "報廢" },
-  { value: "adjustment", label: "轉調" }
+  { value: "adjustment", label: "轉調" },
+  { value: "preorder_pickup", label: "預購取貨" }
 ];
 
 const countTypes = new Set<InventoryMovementType>([
@@ -434,7 +435,7 @@ export function InventoryMovementForm() {
               value={quantity}
               onChange={(event) => setQuantity(event.target.value)}
             />
-            <small>盤點不需填異動量；試吃、報廢、轉調會自動扣庫存。</small>
+            <small>盤點不需填異動量；試吃、報廢、轉調、預購取貨會自動扣庫存。</small>
           </label>
           <label className="field">
             <span>實際盤點庫存{requiresCount ? "" : "（可留空）"}</span>

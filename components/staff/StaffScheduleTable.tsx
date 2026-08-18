@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { taipeiDate } from "@/lib/backend/query-helpers";
 
 type StaffShift = {
   id: string;
@@ -14,6 +15,15 @@ type StaffShift = {
 
 const defaultStaffId = "00000000-0000-4000-8000-000000000001";
 
+type PerformanceRow = {
+  sellerId: string;
+  date?: string;
+  orderCount: number;
+  receivedAmount: number;
+  commission: number;
+  commissionMode?: "daily" | "monthly";
+};
+
 type Performance = {
   todayOrders: number;
   todayAmount: number;
@@ -21,6 +31,7 @@ type Performance = {
   monthOrders: number;
   monthAmount: number;
   monthCommission: number;
+  commissionMode: "daily" | "monthly";
 };
 
 export function StaffScheduleTable() {
@@ -29,54 +40,49 @@ export function StaffScheduleTable() {
   const [status, setStatus] = useState("讀取班表中...");
 
   useEffect(() => {
-    void loadShifts();
-    void loadPerformance();
+    void load();
   }, []);
 
-  async function loadPerformance() {
-    const today = new Date().toISOString().slice(0, 10);
+  async function load() {
+    const meResult = await fetch("/api/me")
+      .then((response) => response.json())
+      .catch(() => null);
+    const staffId = meResult?.ok ? meResult.data.id : defaultStaffId;
+
+    await Promise.all([loadShifts(staffId), loadPerformance(staffId)]);
+  }
+
+  // 業績一律只算登入者本人:店長也會排班,這頁對他同樣是「我的」。
+  // 後端 rows 已是每人一列、共班訂單各分一半,過濾後直接加總即為本人數字。
+  async function loadPerformance(staffId: string) {
+    const today = taipeiDate(new Date().toISOString());
     const result = await fetch(`/api/reports?from=${today.slice(0, 7)}-01&to=${today}`)
       .then((response) => response.json())
       .catch(() => null);
 
     if (!result?.ok) return;
 
-    const todayRows = (result.data.daily ?? []).filter(
-      (row: { date: string }) => row.date === today
-    );
-    const monthRows = result.data.monthly ?? [];
+    const mine = (rows: PerformanceRow[]) => rows.filter((row) => row.sellerId === staffId);
+    const monthRows = mine(result.data.monthly ?? []);
+    const todayRows = mine(result.data.daily ?? []).filter((row) => row.date === today);
+    const sum = (
+      rows: PerformanceRow[],
+      field: "orderCount" | "receivedAmount" | "commission"
+    ) => rows.reduce((total, row) => total + row[field], 0);
 
     setPerformance({
-      todayOrders: todayRows.reduce((total: number, row: { orderCount: number }) => total + row.orderCount, 0),
-      todayAmount: todayRows.reduce(
-        (total: number, row: { receivedAmount: number }) => total + row.receivedAmount,
-        0
-      ),
-      todayCommission: todayRows.reduce(
-        (total: number, row: { commission: number }) => total + row.commission,
-        0
-      ),
-      monthOrders: monthRows.reduce(
-        (total: number, row: { orderCount: number }) => total + row.orderCount,
-        0
-      ),
-      monthAmount: monthRows.reduce(
-        (total: number, row: { receivedAmount: number }) => total + row.receivedAmount,
-        0
-      ),
-      monthCommission: monthRows.reduce(
-        (total: number, row: { commission: number }) => total + row.commission,
-        0
-      )
+      todayOrders: sum(todayRows, "orderCount"),
+      todayAmount: sum(todayRows, "receivedAmount"),
+      todayCommission: sum(todayRows, "commission"),
+      monthOrders: sum(monthRows, "orderCount"),
+      monthAmount: sum(monthRows, "receivedAmount"),
+      monthCommission: sum(monthRows, "commission"),
+      commissionMode: monthRows[0]?.commissionMode ?? "daily"
     });
   }
 
-  async function loadShifts() {
-    const month = new Date().toISOString().slice(0, 7);
-    const meResult = await fetch("/api/me")
-      .then((response) => response.json())
-      .catch(() => null);
-    const staffId = meResult?.ok ? meResult.data.id : defaultStaffId;
+  async function loadShifts(staffId: string) {
+    const month = taipeiDate(new Date().toISOString()).slice(0, 7);
     const response = await fetch(`/api/shifts?staffId=${staffId}&month=${month}`);
     const result = await response.json();
 
@@ -98,11 +104,14 @@ export function StaffScheduleTable() {
           <strong>{formatCurrency(performance?.todayAmount ?? 0)}</strong>
           <small>{performance?.todayOrders ?? 0} 筆訂單</small>
         </article>
-        <article className="panel kpi">
-          <span>今日抽成</span>
-          <strong>{formatCurrency(performance?.todayCommission ?? 0)}</strong>
-          <small>依當日個人業績級距</small>
-        </article>
+        {/* 月結員工每日抽成固定為 0,整張卡不顯示 */}
+        {performance?.commissionMode === "monthly" ? null : (
+          <article className="panel kpi">
+            <span>今日抽成</span>
+            <strong>{formatCurrency(performance?.todayCommission ?? 0)}</strong>
+            <small>依當日個人業績級距</small>
+          </article>
+        )}
         <article className="panel kpi">
           <span>本月業績</span>
           <strong>{formatCurrency(performance?.monthAmount ?? 0)}</strong>
@@ -111,7 +120,9 @@ export function StaffScheduleTable() {
         <article className="panel kpi">
           <span>本月抽成</span>
           <strong>{formatCurrency(performance?.monthCommission ?? 0)}</strong>
-          <small>逐日累計</small>
+          <small>
+            {performance?.commissionMode === "monthly" ? "依本月總業績級距" : "逐日累計"}
+          </small>
         </article>
       </section>
 

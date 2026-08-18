@@ -25,6 +25,7 @@ const movementLabels: Record<InventoryMovementType, string> = {
   sampling: "試吃",
   waste: "報廢",
   adjustment: "轉調",
+  preorder_pickup: "預購取貨",
   sale: "銷售"
 };
 

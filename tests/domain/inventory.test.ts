@@ -17,4 +17,9 @@ describe("normalizeInventoryQuantity", () => {
     expect(normalizeInventoryQuantity("waste", 1)).toBe(-1);
     expect(normalizeInventoryQuantity("sale", 1)).toBe(-1);
   });
+
+  it("deducts stock for preorder pickups", () => {
+    expect(normalizeInventoryQuantity("preorder_pickup", 2)).toBe(-2);
+    expect(normalizeInventoryQuantity("preorder_pickup", -2)).toBe(-2);
+  });
 });

@@ -45,6 +45,7 @@ export type InventoryMovementType =
   | "sampling"
   | "waste"
   | "adjustment"
+  | "preorder_pickup"
   | "sale";
 
 export type CreateInventoryMovementInput = {

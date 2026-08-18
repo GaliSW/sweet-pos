@@ -10,6 +10,7 @@ const deductionTypes = new Set<InventoryMovementType>([
   "sampling",
   "waste",
   "adjustment",
+  "preorder_pickup",
   "sale"
 ]);
 
