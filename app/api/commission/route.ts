@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/guards";
+import { writeAuditLog } from "@/lib/backend/audit";
 import { fetchCommissionTierSets } from "@/lib/backend/commission";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 import { defaultCommissionTiers, type CommissionTier } from "@/lib/domain/pos-rules";
@@ -97,6 +98,7 @@ export async function PUT(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchCommissionSnapshot(supabase, staffId);
 
   // 個人抽成模式(日結/月結)存在 profiles 上
   if (staffId && input.commissionMode) {
@@ -134,6 +136,16 @@ export async function PUT(request: Request) {
     }
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "update",
+    entity: "commission_tiers",
+    entityId: staffId ?? "global",
+    entityLabel: await fetchCommissionLabel(supabase, staffId),
+    before: beforeSnapshot,
+    after: await fetchCommissionSnapshot(supabase, staffId)
+  });
+
   const sets = await fetchCommissionTierSets(supabase);
 
   return NextResponse.json({
@@ -146,4 +158,61 @@ export async function PUT(request: Request) {
       source: "supabase"
     }
   });
+}
+
+// 抽成不是單一資料列,而是一組級距加上該員工的抽成模式。
+// 包成物件而非裸陣列,diffRecords() 才能逐欄位比對。
+async function fetchCommissionSnapshot(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  staffId: string | null
+) {
+  const { data: tierRows } = staffId
+    ? await supabase
+        .from("commission_tiers")
+        .select("min_daily_sales, rate")
+        .eq("staff_id", staffId)
+        .order("min_daily_sales")
+    : await supabase
+        .from("commission_tiers")
+        .select("min_daily_sales, rate")
+        .is("staff_id", null)
+        .order("min_daily_sales");
+
+  let commissionMode: string | null = null;
+
+  if (staffId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("commission_mode")
+      .eq("id", staffId)
+      .maybeSingle();
+
+    commissionMode = (profile?.commission_mode as string) ?? null;
+  }
+
+  return {
+    tiers: (tierRows ?? []).map(
+      (tier: { min_daily_sales: number | string; rate: number | string }) => ({
+        minDailySales: Number(tier.min_daily_sales),
+        rate: Number(tier.rate)
+      })
+    ),
+    commissionMode
+  };
+}
+
+// 個人覆寫顯示員工姓名,全域設定顯示「全域」。
+async function fetchCommissionLabel(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  staffId: string | null
+) {
+  if (!staffId) return "全域";
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", staffId)
+    .maybeSingle();
+
+  return (data?.display_name as string) ?? staffId;
 }

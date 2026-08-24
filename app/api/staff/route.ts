@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { UpsertStaffInput } from "@/lib/backend/api-types";
 import { requireRole } from "@/lib/auth/guards";
+import { writeAuditLog } from "@/lib/backend/audit";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 import { currentShiftStaff } from "@/lib/domain/sample-data";
 
@@ -109,6 +110,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: profileError.message }, { status: 400 });
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "create",
+    entity: "profiles",
+    entityId: created.user.id,
+    entityLabel: input.displayName.trim(),
+    after: await fetchStaffSnapshot(supabase, created.user.id)
+  });
+
   return NextResponse.json({
     ok: true,
     data: { staffId: created.user.id, source: "supabase" }
@@ -144,6 +154,7 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchStaffSnapshot(supabase, input.id);
   const { data, error } = await supabase
     .from("profiles")
     .update({
@@ -171,6 +182,16 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: false, error: passwordError.message }, { status: 400 });
     }
   }
+
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "update",
+    entity: "profiles",
+    entityId: input.id,
+    entityLabel: input.displayName.trim(),
+    before: beforeSnapshot,
+    after: await fetchStaffSnapshot(supabase, input.id)
+  });
 
   return NextResponse.json({
     ok: true,
@@ -201,6 +222,7 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchStaffSnapshot(supabase, input.id);
   const [ordersResult, shiftsResult, movementsResult] = await Promise.all([
     supabase
       .from("orders")
@@ -232,6 +254,17 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ ok: false, error: deactivateError.message }, { status: 400 });
     }
 
+    // 這個分支實際行為是停用而非刪除,如實記為 update。
+    await writeAuditLog(supabase, {
+      actor: guard.profile ?? null,
+      action: "update",
+      entity: "profiles",
+      entityId: input.id,
+      entityLabel: (beforeSnapshot?.display_name as string) ?? null,
+      before: beforeSnapshot,
+      after: await fetchStaffSnapshot(supabase, input.id)
+    });
+
     return NextResponse.json({
       ok: true,
       data: {
@@ -257,6 +290,15 @@ export async function DELETE(request: Request) {
   if (deleteUserError) {
     return NextResponse.json({ ok: false, error: deleteUserError.message }, { status: 400 });
   }
+
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "delete",
+    entity: "profiles",
+    entityId: input.id,
+    entityLabel: (beforeSnapshot?.display_name as string) ?? null,
+    before: beforeSnapshot
+  });
 
   return NextResponse.json({
     ok: true,
@@ -301,4 +343,21 @@ function validateStaffInput(
   }
 
   return { ok: true as const };
+}
+
+// 只讀 profiles 資料列。這張表沒有密碼欄位,所以快照天然不含密碼;
+// 絕不可改成把 UpsertStaffInput 存進去 —— 那裡面有 password。
+async function fetchStaffSnapshot(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  staffId: string
+) {
+  const { data } = await supabase
+    .from("profiles")
+    .select(
+      "id, display_name, role, salary_type, hourly_wage, monthly_salary, is_active, commission_mode"
+    )
+    .eq("id", staffId)
+    .maybeSingle();
+
+  return data ?? null;
 }
