@@ -2024,3 +2024,12 @@ tbody tr:last-child td {
   font-size: 12.5px;
   line-height: 1.7;
 }
+
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}

@@ -16,6 +16,7 @@ type ProductRow = {
   isActive: boolean;
   isPopular: boolean;
   stockSourceProductId: string | null;
+  deletedAt: string | null;
   giftRule: {
     selectionMode: "select" | "fixed";
     requiredFlavorCount: number;
@@ -29,12 +30,14 @@ type FlavorRow = {
   name: string;
   spec: string;
   isActive: boolean;
+  deletedAt: string | null;
 };
 
 type BundleRow = {
   id: string;
   name: string;
   isActive: boolean;
+  deletedAt: string | null;
   productIds: string[];
   tiers: Array<{ quantity: number; price: number }>;
 };
@@ -91,19 +94,22 @@ export function ProductSettings() {
   const [bundleForm, setBundleForm] = useState<UpsertBundleInput>(emptyBundle);
   const [status, setStatus] = useState("讀取商品資料中...");
   const [saving, setSaving] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
   // 新增/編輯共用彈窗:null = 關閉
   const [modal, setModal] = useState<null | "product" | "discount" | "flavor" | "bundle">(null);
 
   useEffect(() => {
     void loadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDeleted]);
 
   async function loadData() {
+    const suffix = showDeleted ? "?includeDeleted=1" : "";
     const [productsResult, discountsResult, flavorsResult, bundlesResult] = await Promise.all([
-      fetch("/api/products").then((response) => response.json()),
+      fetch(`/api/products${suffix}`).then((response) => response.json()),
       fetch("/api/discounts").then((response) => response.json()),
-      fetch("/api/flavors").then((response) => response.json()),
-      fetch("/api/bundles").then((response) => response.json())
+      fetch(`/api/flavors${suffix}`).then((response) => response.json()),
+      fetch(`/api/bundles${suffix}`).then((response) => response.json())
     ]);
 
     if (!productsResult.ok || !discountsResult.ok) {
@@ -165,7 +171,11 @@ export function ProductSettings() {
   }
 
   async function deleteProduct(product: ProductRow) {
-    if (!window.confirm(`確定刪除「${product.name}」？已有訂單或庫存紀錄的商品會改為停用。`)) {
+    if (
+      !window.confirm(
+        `確定刪除「${product.name}」？刪除後 POS 與後台清單都不再顯示，歷史訂單與報表不受影響，可從「顯示已刪除」復原。`
+      )
+    ) {
       return;
     }
 
@@ -186,8 +196,38 @@ export function ProductSettings() {
       return;
     }
 
-    setStatus(result.data.mode === "deactivated" ? result.data.message : `「${product.name}」已刪除`);
+    setStatus(
+      result.data.message
+        ? `「${product.name}」已刪除，${result.data.message}`
+        : `「${product.name}」已刪除`
+    );
     if (productForm.id === product.id) setProductForm(emptyProduct);
+    await loadData();
+  }
+
+  async function restoreItem(
+    endpoint: "/api/products" | "/api/flavors" | "/api/bundles",
+    id: string,
+    name: string
+  ) {
+    setSaving(true);
+    setStatus(`復原「${name}」中...`);
+
+    const response = await fetch(endpoint, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, restore: true })
+    });
+    const result = await response.json();
+
+    setSaving(false);
+
+    if (!result.ok) {
+      setStatus(result.error);
+      return;
+    }
+
+    setStatus(`「${name}」已復原，目前為停用狀態，需要的話再手動啟用`);
     await loadData();
   }
 
@@ -279,7 +319,12 @@ export function ProductSettings() {
   }
 
   async function deleteFlavor(flavor: FlavorRow) {
-    if (!window.confirm(`確定刪除口味「${flavor.name}」？已有紀錄的口味會改為停用。`)) return;
+    if (
+      !window.confirm(
+        `確定刪除口味「${flavor.name}」？刪除後 POS 與後台清單都不再顯示，歷史紀錄不受影響，可從「顯示已刪除」復原。`
+      )
+    )
+      return;
 
     setSaving(true);
     const response = await fetch("/api/flavors", {
@@ -296,7 +341,9 @@ export function ProductSettings() {
     }
 
     setStatus(
-      result.data.mode === "deactivated" ? result.data.message : `口味「${flavor.name}」已刪除`
+      result.data.message
+        ? `口味「${flavor.name}」已刪除，${result.data.message}`
+        : `口味「${flavor.name}」已刪除`
     );
     if (flavorForm.id === flavor.id) setFlavorForm(emptyFlavor);
     await loadData();
@@ -345,7 +392,12 @@ export function ProductSettings() {
   }
 
   async function deleteBundle(bundle: BundleRow) {
-    if (!window.confirm(`確定刪除組合價「${bundle.name}」？`)) return;
+    if (
+      !window.confirm(
+        `確定刪除組合價「${bundle.name}」？刪除後不再套用，可從「顯示已刪除」復原。`
+      )
+    )
+      return;
 
     setSaving(true);
     const response = await fetch("/api/bundles", {
@@ -373,6 +425,14 @@ export function ProductSettings() {
           <h1>商品與折扣</h1>
           <p>管理袋裝商品、禮盒價格、口味規則、組合價與折扣。</p>
         </div>
+        <label className="inline-check">
+          <input
+            checked={showDeleted}
+            onChange={(event) => setShowDeleted(event.target.checked)}
+            type="checkbox"
+          />
+          顯示已刪除
+        </label>
         <span className="pill">{status}</span>
       </section>
 
@@ -411,24 +471,37 @@ export function ProductSettings() {
                   <td>{product.spec}</td>
                   <td>${product.price}</td>
                   <td>{product.isPopular ? <span className="status">常用</span> : "—"}</td>
-                  <td>{product.isActive ? "啟用" : "停用"}</td>
+                  <td>{product.deletedAt ? "已刪除" : product.isActive ? "啟用" : "停用"}</td>
                   <td>
                     <div className="toolbar">
-                      <button
-                        className="secondary-action"
-                        onClick={() => editProduct(product)}
-                        type="button"
-                      >
-                        編輯
-                      </button>
-                      <button
-                        className="secondary-action"
-                        disabled={saving}
-                        onClick={() => deleteProduct(product)}
-                        type="button"
-                      >
-                        刪除
-                      </button>
+                      {product.deletedAt ? (
+                        <button
+                          className="secondary-action"
+                          disabled={saving}
+                          onClick={() => restoreItem("/api/products", product.id, product.name)}
+                          type="button"
+                        >
+                          復原
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            className="secondary-action"
+                            onClick={() => editProduct(product)}
+                            type="button"
+                          >
+                            編輯
+                          </button>
+                          <button
+                            className="secondary-action"
+                            disabled={saving}
+                            onClick={() => deleteProduct(product)}
+                            type="button"
+                          >
+                            刪除
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -467,32 +540,45 @@ export function ProductSettings() {
                 <tr key={flavor.id}>
                   <td>{flavor.name}</td>
                   <td>{flavor.spec}</td>
-                  <td>{flavor.isActive ? "啟用" : "停用"}</td>
+                  <td>{flavor.deletedAt ? "已刪除" : flavor.isActive ? "啟用" : "停用"}</td>
                   <td>
                     <div className="toolbar">
-                      <button
-                        className="secondary-action"
-                        onClick={() => {
-                          setFlavorForm({
-                            id: flavor.id,
-                            name: flavor.name,
-                            spec: flavor.spec,
-                            isActive: flavor.isActive
-                          });
-                          setModal("flavor");
-                        }}
-                        type="button"
-                      >
-                        編輯
-                      </button>
-                      <button
-                        className="secondary-action"
-                        disabled={saving}
-                        onClick={() => deleteFlavor(flavor)}
-                        type="button"
-                      >
-                        刪除
-                      </button>
+                      {flavor.deletedAt ? (
+                        <button
+                          className="secondary-action"
+                          disabled={saving}
+                          onClick={() => restoreItem("/api/flavors", flavor.id, flavor.name)}
+                          type="button"
+                        >
+                          復原
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            className="secondary-action"
+                            onClick={() => {
+                              setFlavorForm({
+                                id: flavor.id,
+                                name: flavor.name,
+                                spec: flavor.spec,
+                                isActive: flavor.isActive
+                              });
+                              setModal("flavor");
+                            }}
+                            type="button"
+                          >
+                            編輯
+                          </button>
+                          <button
+                            className="secondary-action"
+                            disabled={saving}
+                            onClick={() => deleteFlavor(flavor)}
+                            type="button"
+                          >
+                            刪除
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -592,33 +678,46 @@ export function ProductSettings() {
                   <td>
                     {bundle.tiers.map((tier) => `${tier.quantity}件$${tier.price}`).join("、")}
                   </td>
-                  <td>{bundle.isActive ? "啟用" : "停用"}</td>
+                  <td>{bundle.deletedAt ? "已刪除" : bundle.isActive ? "啟用" : "停用"}</td>
                   <td>
                     <div className="toolbar">
-                      <button
-                        className="secondary-action"
-                        onClick={() => {
-                          setBundleForm({
-                            id: bundle.id,
-                            name: bundle.name,
-                            isActive: bundle.isActive,
-                            productIds: [...bundle.productIds],
-                            tiers: bundle.tiers.map((tier) => ({ ...tier }))
-                          });
-                          setModal("bundle");
-                        }}
-                        type="button"
-                      >
-                        編輯
-                      </button>
-                      <button
-                        className="secondary-action"
-                        disabled={saving}
-                        onClick={() => deleteBundle(bundle)}
-                        type="button"
-                      >
-                        刪除
-                      </button>
+                      {bundle.deletedAt ? (
+                        <button
+                          className="secondary-action"
+                          disabled={saving}
+                          onClick={() => restoreItem("/api/bundles", bundle.id, bundle.name)}
+                          type="button"
+                        >
+                          復原
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            className="secondary-action"
+                            onClick={() => {
+                              setBundleForm({
+                                id: bundle.id,
+                                name: bundle.name,
+                                isActive: bundle.isActive,
+                                productIds: [...bundle.productIds],
+                                tiers: bundle.tiers.map((tier) => ({ ...tier }))
+                              });
+                              setModal("bundle");
+                            }}
+                            type="button"
+                          >
+                            編輯
+                          </button>
+                          <button
+                            className="secondary-action"
+                            disabled={saving}
+                            onClick={() => deleteBundle(bundle)}
+                            type="button"
+                          >
+                            刪除
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
