@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth/guards";
+import { writeAuditLog } from "@/lib/backend/audit";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 import { flavors as sampleFlavors } from "@/lib/domain/sample-data";
 
@@ -79,6 +80,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "create",
+    entity: "flavors",
+    entityId: data.id as string,
+    entityLabel: input.name.trim(),
+    after: await fetchFlavorSnapshot(supabase, data.id as string)
+  });
+
   return NextResponse.json({ ok: true, data: { flavorId: data.id, source: "supabase" } });
 }
 
@@ -107,6 +117,7 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchFlavorSnapshot(supabase, input.id);
   const { error } = await supabase
     .from("flavors")
     .update({
@@ -119,6 +130,16 @@ export async function PATCH(request: Request) {
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
+
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "update",
+    entity: "flavors",
+    entityId: input.id,
+    entityLabel: input.name.trim(),
+    before: beforeSnapshot,
+    after: await fetchFlavorSnapshot(supabase, input.id)
+  });
 
   return NextResponse.json({ ok: true, data: { flavorId: input.id, source: "supabase" } });
 }
@@ -142,6 +163,7 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchFlavorSnapshot(supabase, input.id);
   const [giftFlavorsResult, movementsResult, fixedResult] = await Promise.all([
     supabase
       .from("order_item_gift_flavors")
@@ -176,6 +198,17 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     }
 
+    // 這個分支實際行為是停用而非刪除,如實記為 update。
+    await writeAuditLog(supabase, {
+      actor: guard.profile ?? null,
+      action: "update",
+      entity: "flavors",
+      entityId: input.id,
+      entityLabel: (beforeSnapshot?.name as string) ?? null,
+      before: beforeSnapshot,
+      after: await fetchFlavorSnapshot(supabase, input.id)
+    });
+
     return NextResponse.json({
       ok: true,
       data: {
@@ -193,8 +226,31 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "delete",
+    entity: "flavors",
+    entityId: input.id,
+    entityLabel: (beforeSnapshot?.name as string) ?? null,
+    before: beforeSnapshot
+  });
+
   return NextResponse.json({
     ok: true,
     data: { flavorId: input.id, mode: "deleted", source: "supabase" }
   });
+}
+
+// 口味沒有子表,快照即資料列本身。
+async function fetchFlavorSnapshot(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  flavorId: string
+) {
+  const { data } = await supabase
+    .from("flavors")
+    .select("*")
+    .eq("id", flavorId)
+    .maybeSingle();
+
+  return data ?? null;
 }

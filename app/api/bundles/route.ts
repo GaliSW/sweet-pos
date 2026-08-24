@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { UpsertBundleInput } from "@/lib/backend/api-types";
 import { requireRole } from "@/lib/auth/guards";
+import { writeAuditLog } from "@/lib/backend/audit";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 
 // 組合價(量販):指定商品群任選 N 件 $X,可設多個級距(2件500、4件900),
@@ -74,11 +75,21 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchBundleSnapshot(supabase, input.id);
   const { error } = await supabase.from("bundles").delete().eq("id", input.id);
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
+
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "delete",
+    entity: "bundles",
+    entityId: input.id,
+    entityLabel: (beforeSnapshot?.name as string) ?? null,
+    before: beforeSnapshot
+  });
 
   return NextResponse.json({ ok: true, data: { bundleId: input.id, source: "supabase" } });
 }
@@ -135,6 +146,8 @@ async function upsertBundle(request: Request, mode: "create" | "update") {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot =
+    mode === "update" && input.id ? await fetchBundleSnapshot(supabase, input.id) : null;
   let bundleId = input.id ?? null;
 
   if (mode === "create") {
@@ -184,5 +197,48 @@ async function upsertBundle(request: Request, mode: "create" | "update") {
     return NextResponse.json({ ok: false, error: insertError.message }, { status: 400 });
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: mode === "create" ? "create" : "update",
+    entity: "bundles",
+    entityId: bundleId,
+    entityLabel: input.name.trim(),
+    before: beforeSnapshot,
+    after: bundleId ? await fetchBundleSnapshot(supabase, bundleId) : null
+  });
+
   return NextResponse.json({ ok: true, data: { bundleId, source: "supabase" } });
+}
+
+// 組合價的商品群與級距存在兩張子表,快照要含兩者才看得出改了什麼。
+// 排序後再存,避免子表回傳順序不同被誤判成變更。
+async function fetchBundleSnapshot(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  bundleId: string
+) {
+  const { data } = await supabase
+    .from("bundles")
+    .select("id, name, is_active, bundle_products(product_id), bundle_tiers(quantity, price)")
+    .eq("id", bundleId)
+    .maybeSingle();
+
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    name: data.name,
+    is_active: data.is_active,
+    productIds: (data.bundle_products ?? [])
+      .map((row: { product_id: string }) => row.product_id)
+      .sort(),
+    tiers: (data.bundle_tiers ?? [])
+      .map((tier: { quantity: number; price: number | string }) => ({
+        quantity: tier.quantity,
+        price: Number(tier.price)
+      }))
+      .sort(
+        (left: { quantity: number }, right: { quantity: number }) =>
+          left.quantity - right.quantity
+      )
+  };
 }
