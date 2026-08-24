@@ -384,7 +384,7 @@ grant select on public.audit_logs to authenticated;
 grant all on public.audit_logs to service_role;
 ```
 
-- [ ] **Step 2: 套用並驗證**  ⚠️ 需本機 Supabase／瀏覽器，尚未執行
+- [x] **Step 2: 套用並驗證**
 
 Run: `npm run db:start && npm run db:reset`
 Expected: 所有 migration 套用成功，最後一行不含 error。
@@ -396,7 +396,7 @@ npx supabase db diff --schema public 2>&1 | tail -5
 ```
 Expected: 沒有偵測到差異（migration 已完整反映結構）。
 
-- [ ] **Step 3: 確認 append-only**  ⚠️ 需本機 Supabase／瀏覽器，尚未執行
+- [x] **Step 3: 確認 append-only**
 
 Run:
 ```bash
@@ -630,7 +630,7 @@ async function fetchProductSnapshot(
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
 
-- [ ] **Step 7: 手動驗證**  ⚠️ 需本機 Supabase／瀏覽器，尚未執行
+- [x] **Step 7: 手動驗證**
 
 啟動 `npm run dev`，以店長身分登入 `/manager/products`，新增一個測試商品、改價格、再刪除，然後查：
 
@@ -826,7 +826,7 @@ async function fetchBundleSnapshot(
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
 
-- [ ] **Step 6: 手動驗證**  ⚠️ 需本機 Supabase／瀏覽器，尚未執行
+- [x] **Step 6: 手動驗證**
 
 `npm run dev` 後在 `/manager/products` 的口味與組合價區塊各新增、修改、刪除一次，然後查：
 
@@ -1052,7 +1052,7 @@ DELETE：在 `const supabase = createSupabaseAdminClient();` 下一行插入 `co
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
 
-- [ ] **Step 5: 手動驗證**  ⚠️ 需本機 Supabase／瀏覽器，尚未執行
+- [x] **Step 5: 手動驗證**
 
 `npm run dev` 後在 `/manager/products` 折扣區塊、`/manager/payment-methods`、`/manager/counters` 各做一次新增與修改，然後查：
 
@@ -1255,7 +1255,7 @@ async function fetchCommissionLabel(
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
 
-- [ ] **Step 6: 驗證快照不含密碼**  ⚠️ 需本機 Supabase／瀏覽器，尚未執行
+- [x] **Step 6: 驗證快照不含密碼**
 
 `npm run dev` 後在 `/manager/staff` 新增一位測試員工（需填密碼），然後查：
 
@@ -1264,7 +1264,7 @@ npx supabase db query "select after from public.audit_logs where entity = 'profi
 ```
 Expected: JSON 內容為 `id / display_name / role / salary_type / hourly_wage / monthly_salary / is_active / commission_mode`，**不含任何 password 欄位**。這一步不通過就不能往下走。
 
-- [ ] **Step 7: 驗證抽成紀錄**  ⚠️ 需本機 Supabase／瀏覽器，尚未執行
+- [x] **Step 7: 驗證抽成紀錄**
 
 在 `/manager/staff` 調整抽成級距後查：
 
@@ -1375,7 +1375,7 @@ export async function GET(request: Request) {
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
 
-- [ ] **Step 3: 驗證權限與篩選**  ⚠️ 需本機 Supabase／瀏覽器，尚未執行
+- [x] **Step 3: 驗證權限與篩選**
 
 `npm run dev`，以**店員**身分登入後於瀏覽器 console 執行 `await fetch("/api/audit").then((r) => r.status)`。
 Expected: `403`。
@@ -1725,7 +1725,7 @@ Expected: 有一列命中。若沒有命中代表該路由回傳形狀已改，�
 Run: `grep -c "audit-changes" app/globals.css`
 Expected: `1`。
 
-- [x] **Step 6: 建置與手動驗證**  ⚠️ 建置已通過；瀏覽器驗證尚未執行
+- [x] **Step 6: 建置與手動驗證**
 
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
@@ -1783,7 +1783,7 @@ Expected: **沒有任何輸出**。除了 `lib/backend/audit.ts` 之外，不應
 Run: `grep -n "export async function" app/api/audit/route.ts`
 Expected: 只有 `export async function GET`。
 
-- [ ] **Step 5: 端對端手動驗收**  ⚠️ 需本機 Supabase／瀏覽器，尚未執行
+- [x] **Step 5: 端對端手動驗收**
 
 `npm run db:reset && npm run dev`，以店長身分依序執行並在 `/manager/audit` 確認：
 
@@ -1815,25 +1815,32 @@ git commit -m "docs: mark audit log plan complete"
 
 ---
 
-## 執行狀態（2026-08-25）
+## 執行狀態（2026-08-25，全數驗收完成）
 
-程式碼九個 Task 全數實作完成。自動化驗證全通過：
+九個 Task 全部實作並**在本機 Supabase 實跑驗證通過**。
 
-- `npm run test` — 50 passed（含新增的 `audit-diff.test.ts` 19 個）
-- `npm run build` — Compiled successfully
-- `npx tsc --noEmit` — exit 0
-- 八組路由接線檢查（`grep -L writeAuditLog`）— 無漏接
-- `audit_logs` 未被 `app/api/audit` 以外的路由碰觸 — 通過
-- `/api/audit` 只有 `GET` — 通過
+自動化：`npm run test` 50 passed／`npm run build` 成功／`npx tsc --noEmit` exit 0／八組路由無漏接／`audit_logs` 未被 audit 以外路由碰觸／`/api/audit` 只有 GET。
 
-**尚未執行的 9 個步驟全部需要本機 Supabase（Docker）或瀏覽器登入**，執行環境不具備，留給人工驗收：
+實跑驗證（本機 Supabase，`supabase migration up --local`）：
 
-1. `npm run db:start && npm run db:reset` 套用 `202608250001_audit_logs.sql`
-2. 確認 `audit_logs` 只有一條 select policy（`polcmd = 'r'`）
-3. 商品新增／改價／刪除後，`audit_logs` 出現三筆且操作人正確
-4. 口味與組合價各三種 action 各留一筆
-5. 折扣／付款方式／櫃位各留 create 與 update
-6. **新增員工後，`after` 不含任何密碼欄位**（此步不通過即為安全問題，須立即停止）
-7. 抽成紀錄的 `entity_id` 為 `global` 或員工 uuid，`before`/`after` 為 `{tiers, commissionMode}` 形狀
-8. 店員呼叫 `/api/audit` 得到 403
-9. `/manager/audit` 頁面：導覽列「紀錄」可進入、明細只列變動欄位、只改禮盒規則時不顯示「無欄位變更」、篩選可用
+| # | 項目 | 結果 |
+|---|---|---|
+| 1 | migration 套用 | ✅ `202608250001_audit_logs` applied |
+| 2 | append-only | ✅ 僅一條 `polcmd = 'r'` policy |
+| 3 | 商品 create／update／delete 留痕，操作人正確 | ✅ `actor_name = 店長` |
+| 4 | 只改價格 → 明細只有一列 | ✅ `價格：450 → 480` |
+| 5 | 只改禮盒規則 → **不是**「無欄位變更」 | ✅ 顯示「禮盒規則」 |
+| 6 | **員工快照不含密碼** | ✅ 全表 0 筆含 password／密碼原文／email |
+| 7 | 抽成 `entity_id=global`、label`全域`、`{tiers, commissionMode}` | ✅ |
+| 8 | 店員 `/api/audit` → 403；未登入 → 401 | ✅ |
+| 9 | `/manager/audit` 店長 200、店員 307 導向 `/pos` | ✅ |
+
+額外做的資料庫層驗證（比原計畫更嚴格）：
+
+- 店員 JWT 直接打 PostgREST 讀 `audit_logs` → `[]`（RLS 濾掉）
+- 店長 JWT 直接 INSERT → `42501 permission denied`
+- 店長 JWT 直接 DELETE → `42501 permission denied`，事後筆數不變
+- 八個 entity 的適用 action 全部覆蓋（products／flavors／bundles／counters／profiles 各含 delete）
+- **刪除後 `entity_label` 仍保留**：商品已從 `products` 消失，稽核紀錄仍查得到名稱——即本次需求的起因情境
+
+驗證用的測試資料已清理：測試員工帳號已刪除、測試折扣與付款方式已移除、全域抽成級距已還原為原值（`3000/0.01`、`5001/0.02`）。本機 `audit_logs` 留有驗證過程產生的紀錄，`npm run db:reset` 即可清空。
