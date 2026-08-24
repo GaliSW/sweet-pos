@@ -36,7 +36,7 @@
   - `function planProductDeletion(params: { name: string; stockSourceDependents: string[]; bundleNames: string[] }): SoftDeletePlan`
   - `function planFlavorDeletion(params: { name: string; fixedGiftBoxNames: string[]; allowedGiftBoxNames: string[] }): SoftDeletePlan`
 
-- [ ] **Step 1: 寫失敗的測試**
+- [x] **Step 1: 寫失敗的測試**
 
 建立 `tests/domain/soft-delete.test.ts`：
 
@@ -152,12 +152,12 @@ describe("planFlavorDeletion", () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `npx vitest run tests/domain/soft-delete.test.ts`
 Expected: FAIL，訊息為 `Cannot find module '@/lib/domain/soft-delete'`。
 
-- [ ] **Step 3: 實作**
+- [x] **Step 3: 實作**
 
 建立 `lib/domain/soft-delete.ts`：
 
@@ -220,12 +220,12 @@ export function planFlavorDeletion(params: {
 }
 ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run: `npx vitest run tests/domain/soft-delete.test.ts`
 Expected: PASS，9 個測試全綠。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain/soft-delete.ts tests/domain/soft-delete.test.ts
@@ -244,7 +244,7 @@ git commit -m "feat: add soft delete planners"
 - Consumes: 無
 - Produces: `public.products.deleted_at`、`public.flavors.deleted_at`、`public.bundles.deleted_at`，型別皆為 `timestamptz`、可為 null
 
-- [ ] **Step 1: 建立 migration**
+- [x] **Step 1: 建立 migration**
 
 建立 `supabase/migrations/202608250002_soft_delete_catalog.sql`：
 
@@ -261,14 +261,14 @@ alter table public.flavors  add column if not exists deleted_at timestamptz;
 alter table public.bundles  add column if not exists deleted_at timestamptz;
 ```
 
-- [ ] **Step 2: 套用到本機資料庫**
+- [x] **Step 2: 套用到本機資料庫**
 
 > 本專案有 link 到正式區，**所有指令都必須加 `--local`**，不得使用 `supabase db push`。
 
 Run: `npx supabase migration up --local`
 Expected: 輸出含 `Applying migration 202608250002_soft_delete_catalog.sql...` 與 `"message":"Migrations applied"`。
 
-- [ ] **Step 3: 確認欄位存在**
+- [x] **Step 3: 確認欄位存在**
 
 Run:
 ```bash
@@ -279,7 +279,7 @@ docker exec supabase_db_sweet-pos psql -U postgres -d postgres -c \
 ```
 Expected: 三列，`bundles` / `flavors` / `products`，型別皆為 `timestamp with time zone`，`is_nullable` 皆為 `YES`。
 
-- [ ] **Step 4: 稽核明細加上欄位中文名**
+- [x] **Step 4: 稽核明細加上欄位中文名**
 
 修改 `lib/domain/audit-diff.ts`，在 `FIELD_LABELS` 的 `updated_at: "更新時間",` 之後加入一行：
 
@@ -289,12 +289,12 @@ Expected: 三列，`bundles` / `flavors` / `products`，型別皆為 `timestamp 
 
 （快照用 `select("*")`，刪除與復原的變更明細會出現這個欄位，沒有對照表會顯示原始欄位名。）
 
-- [ ] **Step 5: 測試與型別檢查**
+- [x] **Step 5: 測試與型別檢查**
 
 Run: `npm run test && npx tsc --noEmit; echo "exit=$?"`
 Expected: 測試全綠，`exit=0`。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add supabase/migrations/202608250002_soft_delete_catalog.sql lib/domain/audit-diff.ts
@@ -312,7 +312,7 @@ git commit -m "feat: add deleted_at to catalog tables"
 - Consumes: `planProductDeletion`（Task 1）、`writeAuditLog` 與 `fetchProductSnapshot`（皆已存在於本檔）
 - Produces: `GET /api/products?includeDeleted=1`；回應的每個 product 多一個 `deletedAt: string | null`；`PATCH` 接受 `{ id, restore: true }`；`DELETE` 回應 `mode: "deleted"` 並可能帶 `message`
 
-- [ ] **Step 1: 加入 import**
+- [x] **Step 1: 加入 import**
 
 在 `app/api/products/route.ts` 的 import 區塊，於 `import { products as sampleProducts }` 之前加入：
 
@@ -320,7 +320,7 @@ git commit -m "feat: add deleted_at to catalog tables"
 import { planProductDeletion } from "@/lib/domain/soft-delete";
 ```
 
-- [ ] **Step 2: GET 支援 includeDeleted 並回傳 deletedAt**
+- [x] **Step 2: GET 支援 includeDeleted 並回傳 deletedAt**
 
 把 `export async function GET() {` 改成：
 
@@ -362,7 +362,7 @@ function buildProductsQuery(
 }
 ```
 
-- [ ] **Step 3: PATCH 加入復原分支並拒絕編輯已刪除商品**
+- [x] **Step 3: PATCH 加入復原分支並拒絕編輯已刪除商品**
 
 在 PATCH 內，把這段：
 
@@ -442,7 +442,7 @@ function buildProductsQuery(
   }
 ```
 
-- [ ] **Step 4: DELETE 改寫為軟刪除**
+- [x] **Step 4: DELETE 改寫為軟刪除**
 
 把 DELETE 內從 `const supabase = createSupabaseAdminClient();` 開始到函式結束的整段（即參照計數、停用分支、硬刪除）替換為：
 
@@ -525,7 +525,7 @@ function buildProductsQuery(
 }
 ```
 
-- [ ] **Step 5: 型別檢查與建置**
+- [x] **Step 5: 型別檢查與建置**
 
 Run: `npx tsc --noEmit; echo "tsc=$?"`
 Expected: `tsc=0`。
@@ -533,12 +533,12 @@ Expected: `tsc=0`。
 Run: `npm run build 2>&1 | grep -E "Compiled successfully|error"`
 Expected: `✓ Compiled successfully`。
 
-- [ ] **Step 6: 確認舊的硬刪除路徑已消失**
+- [x] **Step 6: 確認舊的硬刪除路徑已消失**
 
 Run: `grep -n 'from("products").delete()\|mode: "deactivated"' app/api/products/route.ts`
 Expected: **沒有任何輸出**。有輸出代表舊路徑還在。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/api/products/route.ts
@@ -556,7 +556,7 @@ git commit -m "feat: soft delete products"
 - Consumes: `planFlavorDeletion`（Task 1）、`writeAuditLog` 與 `fetchFlavorSnapshot`（皆已存在於本檔）
 - Produces: `GET /api/flavors?includeDeleted=1`；回應的每個 flavor 多一個 `deletedAt: string | null`；`PATCH` 接受 `{ id, restore: true }`；`DELETE` 回應 `mode: "deleted"` 並可能帶 `message`
 
-- [ ] **Step 1: 加入 import**
+- [x] **Step 1: 加入 import**
 
 在 `app/api/flavors/route.ts` 的 import 區塊，於 `import { flavors as sampleFlavors }` 之前加入：
 
@@ -564,7 +564,7 @@ git commit -m "feat: soft delete products"
 import { planFlavorDeletion } from "@/lib/domain/soft-delete";
 ```
 
-- [ ] **Step 2: GET 支援 includeDeleted 並回傳 deletedAt**
+- [x] **Step 2: GET 支援 includeDeleted 並回傳 deletedAt**
 
 把 `export async function GET() {` 改成 `export async function GET(request: Request) {`。
 
@@ -592,7 +592,7 @@ import { planFlavorDeletion } from "@/lib/domain/soft-delete";
         deletedAt: flavor.deleted_at ?? null
 ```
 
-- [ ] **Step 3: PATCH 加入復原分支並拒絕編輯已刪除口味**
+- [x] **Step 3: PATCH 加入復原分支並拒絕編輯已刪除口味**
 
 在 PATCH 內，把這段：
 
@@ -680,7 +680,7 @@ import { planFlavorDeletion } from "@/lib/domain/soft-delete";
   }
 ```
 
-- [ ] **Step 4: DELETE 改寫為軟刪除**
+- [x] **Step 4: DELETE 改寫為軟刪除**
 
 把 DELETE 內從 `const supabase = createSupabaseAdminClient();` 開始到函式結束的整段替換為：
 
@@ -762,7 +762,7 @@ import { planFlavorDeletion } from "@/lib/domain/soft-delete";
 }
 ```
 
-- [ ] **Step 5: 型別檢查與建置**
+- [x] **Step 5: 型別檢查與建置**
 
 Run: `npx tsc --noEmit; echo "tsc=$?"`
 Expected: `tsc=0`。
@@ -770,12 +770,12 @@ Expected: `tsc=0`。
 Run: `npm run build 2>&1 | grep -E "Compiled successfully|error"`
 Expected: `✓ Compiled successfully`。
 
-- [ ] **Step 6: 確認舊的硬刪除路徑已消失**
+- [x] **Step 6: 確認舊的硬刪除路徑已消失**
 
 Run: `grep -n 'from("flavors").delete()\|mode: "deactivated"' app/api/flavors/route.ts`
 Expected: **沒有任何輸出**。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/api/flavors/route.ts
@@ -795,7 +795,7 @@ git commit -m "feat: soft delete flavors"
 
 > 組合價**沒有擋下條件也沒有要清的外部關聯**：`bundle_products` 與 `bundle_tiers` 是它自己的子表，軟刪除後它們留著正好讓復原能還原完整內容。
 
-- [ ] **Step 1: GET 支援 includeDeleted 並回傳 deletedAt**
+- [x] **Step 1: GET 支援 includeDeleted 並回傳 deletedAt**
 
 把 `export async function GET() {` 改成 `export async function GET(request: Request) {`。
 
@@ -830,7 +830,7 @@ git commit -m "feat: soft delete flavors"
         deletedAt: bundle.deleted_at ?? null,
 ```
 
-- [ ] **Step 2: `upsertBundle` 加入復原分支並拒絕編輯已刪除組合價**
+- [x] **Step 2: `upsertBundle` 加入復原分支並拒絕編輯已刪除組合價**
 
 在 `upsertBundle` 內，把這段：
 
@@ -913,7 +913,7 @@ git commit -m "feat: soft delete flavors"
   }
 ```
 
-- [ ] **Step 3: `fetchBundleSnapshot` 納入 deleted_at**
+- [x] **Step 3: `fetchBundleSnapshot` 納入 deleted_at**
 
 上一步的防呆需要快照帶有 `deleted_at`。修改檔案下方的 `fetchBundleSnapshot`：
 
@@ -931,7 +931,7 @@ git commit -m "feat: soft delete flavors"
     deleted_at: data.deleted_at ?? null,
 ```
 
-- [ ] **Step 4: DELETE 改寫為軟刪除**
+- [x] **Step 4: DELETE 改寫為軟刪除**
 
 把 DELETE 內從 `const supabase = createSupabaseAdminClient();` 開始到函式結束的整段替換為：
 
@@ -971,7 +971,7 @@ git commit -m "feat: soft delete flavors"
 }
 ```
 
-- [ ] **Step 5: 型別檢查與建置**
+- [x] **Step 5: 型別檢查與建置**
 
 Run: `npx tsc --noEmit; echo "tsc=$?"`
 Expected: `tsc=0`。
@@ -979,12 +979,12 @@ Expected: `tsc=0`。
 Run: `npm run build 2>&1 | grep -E "Compiled successfully|error"`
 Expected: `✓ Compiled successfully`。
 
-- [ ] **Step 6: 確認舊的硬刪除路徑已消失**
+- [x] **Step 6: 確認舊的硬刪除路徑已消失**
 
 Run: `grep -n 'from("bundles").delete()' app/api/bundles/route.ts`
 Expected: **沒有任何輸出**。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/api/bundles/route.ts
@@ -1004,7 +1004,7 @@ git commit -m "feat: soft delete bundles"
 
 > **與 spec 的一處刻意偏離：** spec 寫「三張表的後台清單各加一個勾選框」。商品、口味、組合價三個清單都在同一頁（`/manager/products`），三個勾選框重複且雜亂，改為**頁面層級一個共用勾選框**同時控制三張清單。
 
-- [ ] **Step 1: 型別加上 deletedAt**
+- [x] **Step 1: 型別加上 deletedAt**
 
 在 `components/manager/ProductSettings.tsx` 上方的三個型別各加一個欄位。
 
@@ -1026,7 +1026,7 @@ git commit -m "feat: soft delete bundles"
   deletedAt: string | null;
 ```
 
-- [ ] **Step 2: 加入 showDeleted 狀態並讓 loadData 帶參數**
+- [x] **Step 2: 加入 showDeleted 狀態並讓 loadData 帶參數**
 
 在 `const [saving, setSaving] = useState(false);` 之後加入：
 
@@ -1066,7 +1066,7 @@ git commit -m "feat: soft delete bundles"
 
 （折扣沒有軟刪除，維持原樣。）
 
-- [ ] **Step 3: 加入復原函式**
+- [x] **Step 3: 加入復原函式**
 
 在 `deleteProduct` 函式之後加入三個復原函式：
 
@@ -1098,7 +1098,7 @@ git commit -m "feat: soft delete bundles"
   }
 ```
 
-- [ ] **Step 4: 更新三個刪除確認訊息**
+- [x] **Step 4: 更新三個刪除確認訊息**
 
 刪除不再會靜默降級成停用，確認文字要改掉。
 
@@ -1152,7 +1152,7 @@ git commit -m "feat: soft delete bundles"
       return;
 ```
 
-- [ ] **Step 5: 刪除結果訊息改掉降級判斷**
+- [x] **Step 5: 刪除結果訊息改掉降級判斷**
 
 把 `deleteProduct` 內的：
 
@@ -1184,7 +1184,7 @@ git commit -m "feat: soft delete bundles"
         : `口味「${flavor.name}」已刪除`
 ```
 
-- [ ] **Step 6: 加入「顯示已刪除」勾選框**
+- [x] **Step 6: 加入「顯示已刪除」勾選框**
 
 在最外層第一個 `<section>` 內、顯示 `{status}` 的 `<span className="pill">` 之前加入：
 
@@ -1212,7 +1212,7 @@ git commit -m "feat: soft delete bundles"
 }
 ```
 
-- [ ] **Step 7: 三個清單顯示已刪除狀態與復原按鈕**
+- [x] **Step 7: 三個清單顯示已刪除狀態與復原按鈕**
 
 三個清單的「狀態」欄與「操作」欄都要改。已刪除的列只顯示「復原」，不顯示編輯與刪除。
 
@@ -1439,7 +1439,7 @@ git commit -m "feat: soft delete bundles"
                   </td>
 ```
 
-- [ ] **Step 8: 型別檢查與建置**
+- [x] **Step 8: 型別檢查與建置**
 
 Run: `npx tsc --noEmit; echo "tsc=$?"`
 Expected: `tsc=0`。
@@ -1447,7 +1447,7 @@ Expected: `tsc=0`。
 Run: `npm run build 2>&1 | grep -E "Compiled successfully|error"`
 Expected: `✓ Compiled successfully`。
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add components/manager/ProductSettings.tsx app/globals.css
@@ -1467,12 +1467,12 @@ git commit -m "feat: show and restore soft deleted catalog items"
 
 > 需要本機 Supabase 與 dev server。**本專案有 link 到正式區，任何資料庫指令都必須加 `--local`。**
 
-- [ ] **Step 1: 全套測試與建置**
+- [x] **Step 1: 全套測試與建置**
 
 Run: `npm run test && npm run build 2>&1 | grep -E "Compiled successfully|error"`
 Expected: 測試全綠（含 Task 1 的 9 個新測試），`✓ Compiled successfully`。
 
-- [ ] **Step 2: 啟動環境並取得店長 session**
+- [x] **Step 2: 啟動環境並取得店長 session**
 
 Run:
 ```bash
@@ -1482,7 +1482,7 @@ npm run dev &
 
 以 `manager@example.local` / `password123` 登入取得 cookie（種子帳號密碼見 `supabase/seed.sql`）。
 
-- [ ] **Step 3: 驗證賣過的商品可以真的刪除**
+- [x] **Step 3: 驗證賣過的商品可以真的刪除**
 
 先挑一個有訂單紀錄的商品，刪除它，然後確認：
 
@@ -1492,7 +1492,7 @@ docker exec supabase_db_sweet-pos psql -U postgres -d postgres -c \
 ```
 Expected: `is_active = f` 且 `deleted = t`。這是本次的核心目標——**賣過的商品不再只能停用**。
 
-- [ ] **Step 4: 驗證歷史資料完好**
+- [x] **Step 4: 驗證歷史資料完好**
 
 ```bash
 docker exec supabase_db_sweet-pos psql -U postgres -d postgres -c \
@@ -1502,29 +1502,29 @@ Expected: 筆數與刪除前相同（外鍵未動、歷史訂單完整）。
 
 同時開啟 `/manager/reports`，確認該商品的歷史數字沒有變化、訂單明細仍顯示商品名稱。
 
-- [ ] **Step 5: 驗證已刪除商品從 POS 消失**
+- [x] **Step 5: 驗證已刪除商品從 POS 消失**
 
 ```bash
 curl -s -H "cookie: <店長cookie>" http://127.0.0.1:3000/api/catalog | grep -c '<商品ID>'
 ```
 Expected: `0`。已刪除商品不再出現在 POS 型錄。
 
-- [ ] **Step 6: 驗證庫存來源會擋下刪除**
+- [x] **Step 6: 驗證庫存來源會擋下刪除**
 
 建立商品 A，再建立商品 B 並把 B 的庫存來源設為 A，然後刪除 A。
 Expected: 回 400，錯誤訊息指出「A」是 B 的庫存來源，並列出 B 的名稱。
 
-- [ ] **Step 7: 驗證組合價關聯會被清掉且有告知**
+- [x] **Step 7: 驗證組合價關聯會被清掉且有告知**
 
 把某商品加入一個組合價後刪除該商品。
 Expected: 刪除成功，回應的 `message` 含「已從組合價「<組合名>」移除此商品」；該組合價本身仍存在。
 
-- [ ] **Step 8: 驗證固定禮盒口味會擋下刪除**
+- [x] **Step 8: 驗證固定禮盒口味會擋下刪除**
 
 刪除一個被固定禮盒使用的口味（種子資料中「發禮盒」有固定口味）。
 Expected: 回 400，訊息列出該禮盒名稱。
 
-- [ ] **Step 9: 驗證顯示已刪除與復原**
+- [x] **Step 9: 驗證顯示已刪除與復原**
 
 在 `/manager/products` 勾選「顯示已刪除」。
 Expected: 已刪除項目出現、狀態顯示「已刪除」、只有「復原」按鈕。
@@ -1532,7 +1532,7 @@ Expected: 已刪除項目出現、狀態顯示「已刪除」、只有「復原�
 按「復原」。
 Expected: 項目回到清單，狀態為「停用」（不是「啟用」），訊息提示需要時再手動啟用。
 
-- [ ] **Step 10: 驗證已刪除項目不可直接編輯**
+- [x] **Step 10: 驗證已刪除項目不可直接編輯**
 
 對一個已刪除的商品送出一般 PATCH（不帶 `restore`）：
 
@@ -1543,7 +1543,7 @@ curl -s -X PATCH http://127.0.0.1:3000/api/products \
 ```
 Expected: `ok: false`，錯誤為「商品已刪除，請先復原後再編輯」。這道防呆擋住的是「把已刪除商品的 `is_active` 改回 true 讓它重回 POS」。
 
-- [ ] **Step 11: 驗證刪除與復原都有稽核紀錄**
+- [x] **Step 11: 驗證刪除與復原都有稽核紀錄**
 
 ```bash
 docker exec supabase_db_sweet-pos psql -U postgres -d postgres -c \
@@ -1552,7 +1552,7 @@ docker exec supabase_db_sweet-pos psql -U postgres -d postgres -c \
 ```
 Expected: 看得到 `delete` 與復原產生的 `update`，`entity_label` 正確。
 
-- [ ] **Step 12: 勾選計畫並 commit**
+- [x] **Step 12: 勾選計畫並 commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-25-catalog-soft-delete.md
@@ -1567,3 +1567,32 @@ git commit -m "docs: mark soft delete plan complete"
 - 庫存總表（`inventory_stock_summary`）由歷史異動推導，已刪除商品若有殘留庫存仍會出現在庫存頁。這反映的是真實庫存，不視為缺陷。
 - 不提供「永久清除」已刪除項目的功能。真的要清只能進 SQL Editor。
 - `discounts` / `counters` / `payment_methods` 的刪除行為維持現狀（有紀錄時靜默降級成停用），不在本次範圍。
+
+---
+
+## 執行狀態（2026-08-25，全數驗收完成）
+
+七個 Task 全部實作並在本機 Supabase 實跑驗證通過（`migration up --local`，正式區未動）。
+
+自動化：`npm run test` 59 passed（含 Task 1 的 9 個新測試）／`npm run build` 成功／`npx tsc --noEmit` exit 0／三個路由的舊硬刪除路徑與 `mode: "deactivated"` 皆已消失。
+
+實跑驗證：
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1 | **賣過的商品真的能刪** | ✅ 有 9 筆訂單的「包種烏龍牛軋糖」回 `mode: "deleted"`，`is_active=f`、`deleted_at` 已設 |
+| 2 | 歷史資料完好 | ✅ `order_items` 刪除前後同為 9 筆 |
+| 3 | 已刪除從 POS 消失 | ✅ `/api/catalog` 出現次數 0 |
+| 4 | 後台清單過濾 | ✅ 預設 0、`includeDeleted=1` 為 1 |
+| 5 | 庫存來源擋下刪除 | ✅ 「軟刪除來源A」被擋，訊息指名「軟刪除依賴B」 |
+| 6 | 組合價關聯清掉並告知 | ✅ `message` 為「已從組合價「袋裝任選」移除此商品」，組合價本身仍在 |
+| 7 | 固定禮盒口味擋下刪除 | ✅ 「包種烏龍」被擋，訊息指名「發禮盒」 |
+| 8 | 自選禮盒口味放行並清關聯 | ✅ 「焙茶」刪除成功，`gift_box_allowed_flavors` 由 1 變 0 |
+| 9 | 組合價軟刪除與復原 | ✅ 子表（3 商品 / 2 級距）完好保留，復原後內容還原 |
+| 10 | **已刪除不可直接編輯** | ✅ 回「商品已刪除，請先復原後再編輯」，名稱與 `is_active` 均未被改動 |
+| 11 | 復原維持停用 | ✅ 復原後 `deleted_at=null` 但 `is_active` 仍為 `false` |
+| 12 | 刪除與復原都有稽核紀錄 | ✅ `delete` 與復原的 `update` 皆入帳；被擋下的刪除**不留紀錄**（正確） |
+
+驗證用的資料已全部還原（用稽核紀錄的 `before` 快照比對）：商品 101、口味「焙茶」、組合價「袋裝任選」都回到啟用且未刪除，`bundle_products` 回到 4 筆、`gift_box_allowed_flavors` 回到 1 筆，測試商品已清除，全庫 `deleted_at` 非空筆數為 0。
+
+> **注意：** 本機的「袋裝任選」組合價與 `gift_box_allowed_flavors` 都**不在 `seed.sql` 裡**，是本機自建資料。因此不可用 `npm run db:reset` 來清理驗證痕跡——那會連這些資料一起毀掉。
