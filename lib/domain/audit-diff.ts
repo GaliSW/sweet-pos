@@ -29,6 +29,7 @@ const FIELD_LABELS: Record<string, string> = {
   sort_order: "排序",
   created_at: "建立時間",
   updated_at: "更新時間",
+  deleted_at: "刪除時間",
   // products
   category: "類別",
   is_popular: "熱門",
