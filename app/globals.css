@@ -2016,3 +2016,20 @@ tbody tr:last-child td {
     background: linear-gradient(270deg, rgba(63, 45, 26, 0.08), transparent);
   }
 }
+
+.audit-changes {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}

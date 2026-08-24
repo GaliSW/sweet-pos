@@ -7,6 +7,7 @@ import {
   taipeiDayStart
 } from "@/lib/backend/query-helpers";
 import { requireRole } from "@/lib/auth/guards";
+import { writeAuditLog } from "@/lib/backend/audit";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 import { counters as sampleCounters } from "@/lib/domain/sample-data";
 
@@ -144,6 +145,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: targetError }, { status: 400 });
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "create",
+    entity: "counters",
+    entityId: data.id as string,
+    entityLabel: input.name.trim(),
+    after: await fetchCounterSnapshot(supabase, data.id as string)
+  });
+
   return NextResponse.json({
     ok: true,
     data: { counterId: data.id, source: "supabase" }
@@ -175,6 +185,7 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchCounterSnapshot(supabase, input.id);
   const { data, error } = await supabase
     .from("counters")
     .update({
@@ -195,6 +206,16 @@ export async function PATCH(request: Request) {
   if (targetError) {
     return NextResponse.json({ ok: false, error: targetError }, { status: 400 });
   }
+
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "update",
+    entity: "counters",
+    entityId: input.id,
+    entityLabel: input.name.trim(),
+    before: beforeSnapshot,
+    after: await fetchCounterSnapshot(supabase, input.id)
+  });
 
   return NextResponse.json({
     ok: true,
@@ -221,6 +242,7 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchCounterSnapshot(supabase, input.id);
   const [ordersResult, shiftsResult, movementsResult] = await Promise.all([
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("counter_id", input.id),
     supabase.from("shifts").select("id", { count: "exact", head: true }).eq("counter_id", input.id),
@@ -248,6 +270,17 @@ export async function DELETE(request: Request) {
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     }
+
+    // 這個分支實際行為是停用而非刪除,如實記為 update。
+    await writeAuditLog(supabase, {
+      actor: guard.profile ?? null,
+      action: "update",
+      entity: "counters",
+      entityId: input.id,
+      entityLabel: (beforeSnapshot?.name as string) ?? null,
+      before: beforeSnapshot,
+      after: await fetchCounterSnapshot(supabase, input.id)
+    });
 
     return NextResponse.json({
       ok: true,
@@ -293,6 +326,15 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "delete",
+    entity: "counters",
+    entityId: input.id,
+    entityLabel: (beforeSnapshot?.name as string) ?? null,
+    before: beforeSnapshot
+  });
+
   return NextResponse.json({
     ok: true,
     data: { counterId: input.id, mode: "deleted", source: "supabase" }
@@ -334,4 +376,31 @@ function validateCounterInput(input: UpsertCounterInput) {
   }
 
   return { ok: true as const };
+}
+
+// 櫃位的月目標與櫃位在同一次請求寫入(upsertMonthlyTarget),快照要含兩者。
+async function fetchCounterSnapshot(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  counterId: string
+) {
+  const [counterResult, targetsResult] = await Promise.all([
+    supabase.from("counters").select("*").eq("id", counterId).maybeSingle(),
+    supabase
+      .from("counter_monthly_targets")
+      .select("month, target_amount")
+      .eq("counter_id", counterId)
+      .order("month")
+  ]);
+
+  if (!counterResult.data) return null;
+
+  return {
+    ...counterResult.data,
+    monthlyTargets: (targetsResult.data ?? []).map(
+      (row: { month: string; target_amount: number | string }) => ({
+        month: row.month,
+        targetAmount: Number(row.target_amount)
+      })
+    )
+  };
 }

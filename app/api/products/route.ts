@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import type { UpsertProductInput } from "@/lib/backend/api-types";
 import { requireRole } from "@/lib/auth/guards";
+import { writeAuditLog } from "@/lib/backend/audit";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
+import { planProductDeletion } from "@/lib/domain/soft-delete";
 import { products as sampleProducts } from "@/lib/domain/sample-data";
 
-export async function GET() {
+export async function GET(request: Request) {
   const guard = await requireRole("manager");
 
   if (guard.failure) return guard.failure;
@@ -36,7 +38,7 @@ export async function GET() {
 
   const supabase = createSupabaseAdminClient();
   const [productsResult, rulesResult, allowedResult] = await Promise.all([
-    supabase.from("products").select("*").order("category").order("name"),
+    buildProductsQuery(supabase, request),
     supabase.from("gift_box_rules").select("*"),
     supabase.from("gift_box_allowed_flavors").select("product_id, flavor_id")
   ]);
@@ -73,6 +75,7 @@ export async function GET() {
           isActive: product.is_active,
           isPopular: Boolean(product.is_popular),
           stockSourceProductId: product.stock_source_product_id ?? null,
+          deletedAt: product.deleted_at ?? null,
           giftRule: rule
             ? {
                 selectionMode: rule.selection_mode,
@@ -133,6 +136,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: ruleError }, { status: 400 });
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "create",
+    entity: "products",
+    entityId: data.id as string,
+    entityLabel: input.name.trim(),
+    after: await fetchProductSnapshot(supabase, data.id as string)
+  });
+
   return NextResponse.json({
     ok: true,
     data: { productId: data.id, source: "supabase" }
@@ -144,10 +156,47 @@ export async function PATCH(request: Request) {
 
   if (guard.failure) return guard.failure;
 
-  const input = (await request.json()) as UpsertProductInput;
+  const input = (await request.json()) as UpsertProductInput & { restore?: boolean };
 
   if (!input.id) {
     return NextResponse.json({ ok: false, error: "缺少商品編號" }, { status: 400 });
+  }
+
+  // 復原:只把 deleted_at 設回 null,其他欄位一律不動,也不跑欄位驗證。
+  // 維持 is_active = false,要不要重新啟用由店長另外決定。
+  if (input.restore) {
+    if (!hasSupabaseAdminEnv()) {
+      return NextResponse.json({
+        ok: true,
+        data: { productId: input.id, mode: "restored", source: "demo" }
+      });
+    }
+
+    const supabase = createSupabaseAdminClient();
+    const beforeSnapshot = await fetchProductSnapshot(supabase, input.id);
+    const { error } = await supabase
+      .from("products")
+      .update({ deleted_at: null })
+      .eq("id", input.id);
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    }
+
+    await writeAuditLog(supabase, {
+      actor: guard.profile ?? null,
+      action: "update",
+      entity: "products",
+      entityId: input.id,
+      entityLabel: (beforeSnapshot?.name as string) ?? null,
+      before: beforeSnapshot,
+      after: await fetchProductSnapshot(supabase, input.id)
+    });
+
+    return NextResponse.json({
+      ok: true,
+      data: { productId: input.id, mode: "restored", source: "supabase" }
+    });
   }
 
   const validation = validateProductInput(input);
@@ -164,6 +213,14 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchProductSnapshot(supabase, input.id);
+
+  if (beforeSnapshot?.deleted_at) {
+    return NextResponse.json(
+      { ok: false, error: "商品已刪除，請先復原後再編輯" },
+      { status: 400 }
+    );
+  }
 
   const { data, error } = await supabase
     .from("products")
@@ -190,6 +247,16 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: false, error: ruleError }, { status: 400 });
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "update",
+    entity: "products",
+    entityId: data.id as string,
+    entityLabel: input.name.trim(),
+    before: beforeSnapshot,
+    after: await fetchProductSnapshot(supabase, data.id as string)
+  });
+
   return NextResponse.json({
     ok: true,
     data: { productId: data.id, source: "supabase" }
@@ -215,55 +282,87 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
-  const [orderItemsResult, movementsResult] = await Promise.all([
+  const beforeSnapshot = await fetchProductSnapshot(supabase, input.id);
+
+  if (!beforeSnapshot) {
+    return NextResponse.json({ ok: false, error: "找不到商品" }, { status: 404 });
+  }
+
+  const [dependentsResult, bundlesResult] = await Promise.all([
     supabase
-      .from("order_items")
-      .select("id", { count: "exact", head: true })
-      .eq("product_id", input.id),
-    supabase
-      .from("inventory_movements")
-      .select("id", { count: "exact", head: true })
-      .eq("product_id", input.id)
+      .from("products")
+      .select("name")
+      .eq("stock_source_product_id", input.id)
+      .is("deleted_at", null),
+    supabase.from("bundle_products").select("bundles(name)").eq("product_id", input.id)
   ]);
 
-  const countError = orderItemsResult.error ?? movementsResult.error;
+  const lookupError = dependentsResult.error ?? bundlesResult.error;
 
-  if (countError) {
-    return NextResponse.json({ ok: false, error: countError.message }, { status: 500 });
+  if (lookupError) {
+    return NextResponse.json({ ok: false, error: lookupError.message }, { status: 500 });
   }
 
-  const referenceCount = (orderItemsResult.count ?? 0) + (movementsResult.count ?? 0);
+  // PostgREST 的嵌入關聯在型別上被推成陣列,實際多對一時回傳物件,兩種都要能吃。
+  const bundleNames = (bundlesResult.data ?? []).flatMap((row) => {
+    const embedded = (row as { bundles?: unknown }).bundles;
+    const list = Array.isArray(embedded) ? embedded : embedded ? [embedded] : [];
 
-  if (referenceCount > 0) {
-    const { error } = await supabase
-      .from("products")
-      .update({ is_active: false })
-      .eq("id", input.id);
+    return list
+      .map((item) => (item as { name?: string } | null)?.name)
+      .filter((name): name is string => Boolean(name));
+  });
 
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+  const plan = planProductDeletion({
+    name: beforeSnapshot.name as string,
+    stockSourceDependents: (dependentsResult.data ?? []).map((row) => row.name as string),
+    bundleNames
+  });
+
+  if (!plan.ok) {
+    return NextResponse.json({ ok: false, error: plan.error }, { status: 400 });
+  }
+
+  // 軟刪除不會觸發 cascade,組合價關聯要自己清掉(效果等同原本的 on delete cascade,但改成明示)。
+  if (plan.clearedRelation) {
+    const { error: clearError } = await supabase
+      .from("bundle_products")
+      .delete()
+      .eq("product_id", input.id);
+
+    if (clearError) {
+      return NextResponse.json({ ok: false, error: clearError.message }, { status: 400 });
     }
-
-    return NextResponse.json({
-      ok: true,
-      data: {
-        productId: input.id,
-        mode: "deactivated",
-        message: "商品已有訂單或庫存紀錄，已改為停用（保留歷史資料）",
-        source: "supabase"
-      }
-    });
   }
 
-  const { error } = await supabase.from("products").delete().eq("id", input.id);
+  // 同時停用是關鍵:POS 端既有的 is_active 過濾因此自動排除已刪除商品。
+  const { error } = await supabase
+    .from("products")
+    .update({ deleted_at: new Date().toISOString(), is_active: false })
+    .eq("id", input.id);
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "delete",
+    entity: "products",
+    entityId: input.id,
+    entityLabel: beforeSnapshot.name as string,
+    before: beforeSnapshot,
+    after: await fetchProductSnapshot(supabase, input.id)
+  });
+
   return NextResponse.json({
     ok: true,
-    data: { productId: input.id, mode: "deleted", source: "supabase" }
+    data: {
+      productId: input.id,
+      mode: "deleted",
+      message: plan.clearedRelation ?? undefined,
+      source: "supabase"
+    }
   });
 }
 
@@ -338,4 +437,47 @@ function validateProductInput(input: UpsertProductInput) {
   }
 
   return { ok: true as const };
+}
+
+// 稽核快照:涵蓋這支路由同一次請求會寫到的全部內容(商品本身 + 禮盒規則),
+// 否則只改禮盒規則時,變更明細會顯示「無變更」。
+async function fetchProductSnapshot(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  productId: string
+) {
+  const [productResult, ruleResult, allowedResult] = await Promise.all([
+    supabase.from("products").select("*").eq("id", productId).maybeSingle(),
+    supabase.from("gift_box_rules").select("*").eq("product_id", productId).maybeSingle(),
+    supabase.from("gift_box_allowed_flavors").select("flavor_id").eq("product_id", productId)
+  ]);
+
+  const product = productResult.data;
+
+  if (!product) return null;
+
+  return {
+    ...product,
+    giftRule: ruleResult.data
+      ? {
+          selectionMode: ruleResult.data.selection_mode,
+          requiredFlavorCount: ruleResult.data.required_flavor_count,
+          includesScallionCracker: ruleResult.data.includes_scallion_cracker,
+          allowedFlavorIds: (allowedResult.data ?? [])
+            .map((row) => row.flavor_id as string)
+            .sort()
+        }
+      : null
+  };
+}
+
+// 後台清單預設不顯示已刪除商品;帶 includeDeleted=1 才顯示(供「顯示已刪除」勾選框使用)。
+function buildProductsQuery(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  request: Request
+) {
+  const includeDeleted =
+    new URL(request.url).searchParams.get("includeDeleted") === "1";
+  const query = supabase.from("products").select("*").order("category").order("name");
+
+  return includeDeleted ? query : query.is("deleted_at", null);
 }

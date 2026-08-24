@@ -39,7 +39,7 @@
   - `function auditFieldLabel(field: string): string`
   - `function auditValuesEqual(left: unknown, right: unknown): boolean`
 
-- [ ] **Step 1: 寫失敗的測試**
+- [x] **Step 1: 寫失敗的測試**
 
 建立 `tests/domain/audit-diff.test.ts`：
 
@@ -167,12 +167,12 @@ describe("label 對照", () => {
 });
 ```
 
-- [ ] **Step 2: 執行測試確認失敗**
+- [x] **Step 2: 執行測試確認失敗**
 
 Run: `npx vitest run tests/domain/audit-diff.test.ts`
 Expected: FAIL，訊息為 `Failed to resolve import "@/lib/domain/audit-diff"`。
 
-- [ ] **Step 3: 實作**
+- [x] **Step 3: 實作**
 
 建立 `lib/domain/audit-diff.ts`：
 
@@ -325,12 +325,12 @@ export function diffRecords(before: unknown, after: unknown): AuditFieldChange[]
 }
 ```
 
-- [ ] **Step 4: 執行測試確認通過**
+- [x] **Step 4: 執行測試確認通過**
 
 Run: `npx vitest run tests/domain/audit-diff.test.ts`
 Expected: PASS，19 個測試全綠（`diffRecords` 12 個、`formatAuditValue` 4 個、label 對照 3 個）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add lib/domain/audit-diff.ts tests/domain/audit-diff.test.ts
@@ -348,7 +348,7 @@ git commit -m "feat: add audit diff helpers"
 - Consumes: `private.is_manager()`（來自 `20260807132637_harden_function_privileges_and_index_foreign_keys.sql`）
 - Produces: `public.audit_logs` 表，欄位 `id / actor_id / actor_name / action / entity / entity_id / entity_label / before / after / created_at`
 
-- [ ] **Step 1: 建立 migration**
+- [x] **Step 1: 建立 migration**
 
 建立 `supabase/migrations/202608250001_audit_logs.sql`：
 
@@ -384,7 +384,7 @@ grant select on public.audit_logs to authenticated;
 grant all on public.audit_logs to service_role;
 ```
 
-- [ ] **Step 2: 套用並驗證**
+- [x] **Step 2: 套用並驗證**
 
 Run: `npm run db:start && npm run db:reset`
 Expected: 所有 migration 套用成功，最後一行不含 error。
@@ -396,7 +396,7 @@ npx supabase db diff --schema public 2>&1 | tail -5
 ```
 Expected: 沒有偵測到差異（migration 已完整反映結構）。
 
-- [ ] **Step 3: 確認 append-only**
+- [x] **Step 3: 確認 append-only**
 
 Run:
 ```bash
@@ -406,7 +406,7 @@ Expected: 只有一列，`polname` 為 `managers read audit logs`、`polcmd` 為
 
 > 若本機 Supabase 未啟動導致上述指令失敗，改用 Supabase Dashboard 的 SQL Editor 執行同一段查詢。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add supabase/migrations/202608250001_audit_logs.sql
@@ -427,7 +427,7 @@ git commit -m "feat: add audit_logs table"
   - `function writeAuditLog(supabase: AuditClient, params: AuditParams): Promise<void>` — 永不 throw、永不回傳失敗
   - `type AuditParams = { actor: SessionProfile | null; action: AuditAction; entity: string; entityId: string | null; entityLabel: string | null; before?: unknown; after?: unknown }`
 
-- [ ] **Step 1: 實作**
+- [x] **Step 1: 實作**
 
 建立 `lib/backend/audit.ts`：
 
@@ -485,12 +485,12 @@ export async function writeAuditLog(
 }
 ```
 
-- [ ] **Step 2: 型別檢查**
+- [x] **Step 2: 型別檢查**
 
 Run: `npx tsc --noEmit`
 Expected: 無錯誤。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add lib/backend/audit.ts
@@ -508,7 +508,7 @@ git commit -m "feat: add writeAuditLog helper"
 - Consumes: `writeAuditLog`（Task 3）
 - Produces: 本檔內部的 `fetchProductSnapshot(supabase, productId)`，回傳 `products` 資料列加上 `giftRule` 子物件
 
-- [ ] **Step 1: 加入 import**
+- [x] **Step 1: 加入 import**
 
 在 `app/api/products/route.ts` 既有 import 區塊，於 `import { requireRole }` 之後加入一行：
 
@@ -516,7 +516,7 @@ git commit -m "feat: add writeAuditLog helper"
 import { writeAuditLog } from "@/lib/backend/audit";
 ```
 
-- [ ] **Step 2: 加入快照函式**
+- [x] **Step 2: 加入快照函式**
 
 在檔案最下方（既有的 `validateProductInput` 之後）加入：
 
@@ -553,7 +553,7 @@ async function fetchProductSnapshot(
 }
 ```
 
-- [ ] **Step 3: POST 記錄新增**
+- [x] **Step 3: POST 記錄新增**
 
 在 POST 內，`upsertGiftRule` 的錯誤檢查之後、`return NextResponse.json` 之前插入：
 
@@ -568,7 +568,7 @@ async function fetchProductSnapshot(
   });
 ```
 
-- [ ] **Step 4: PATCH 記錄修改**
+- [x] **Step 4: PATCH 記錄修改**
 
 在 PATCH 內，`const supabase = createSupabaseAdminClient();` 的**下一行**插入（必須在 update 之前取得 before）：
 
@@ -590,7 +590,7 @@ async function fetchProductSnapshot(
   });
 ```
 
-- [ ] **Step 5: DELETE 記錄刪除與降級**
+- [x] **Step 5: DELETE 記錄刪除與降級**
 
 在 DELETE 內，`const supabase = createSupabaseAdminClient();` 的**下一行**插入：
 
@@ -625,12 +625,12 @@ async function fetchProductSnapshot(
   });
 ```
 
-- [ ] **Step 6: 型別檢查與建置**
+- [x] **Step 6: 型別檢查與建置**
 
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
 
-- [ ] **Step 7: 手動驗證**
+- [x] **Step 7: 手動驗證**
 
 啟動 `npm run dev`，以店長身分登入 `/manager/products`，新增一個測試商品、改價格、再刪除，然後查：
 
@@ -639,7 +639,7 @@ npx supabase db query "select actor_name, action, entity, entity_label, created_
 ```
 Expected: 三列，`actor_name` 是登入的店長姓名，`action` 依序為 `delete` / `update` / `create`，`entity_label` 是該測試商品名稱。
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add app/api/products/route.ts
@@ -658,7 +658,7 @@ git commit -m "feat: audit product changes"
 - Consumes: `writeAuditLog`（Task 3）
 - Produces: `app/api/bundles/route.ts` 內部的 `fetchBundleSnapshot(supabase, bundleId)`，回傳 `{ id, name, is_active, productIds, tiers }`
 
-- [ ] **Step 1: flavors — 加入 import 與快照函式**
+- [x] **Step 1: flavors — 加入 import 與快照函式**
 
 在 `app/api/flavors/route.ts` 的 import 區塊加入：
 
@@ -684,7 +684,7 @@ async function fetchFlavorSnapshot(
 }
 ```
 
-- [ ] **Step 2: flavors — 三個 mutation 接線**
+- [x] **Step 2: flavors — 三個 mutation 接線**
 
 POST：在成功取得新增資料列、`return` 之前插入：
 
@@ -740,7 +740,7 @@ DELETE：在 `const supabase = createSupabaseAdminClient();` 下一行插入 `co
   });
 ```
 
-- [ ] **Step 3: bundles — 加入 import 與快照函式**
+- [x] **Step 3: bundles — 加入 import 與快照函式**
 
 在 `app/api/bundles/route.ts` 的 import 區塊加入：
 
@@ -785,7 +785,7 @@ async function fetchBundleSnapshot(
 }
 ```
 
-- [ ] **Step 4: bundles — `upsertBundle` 與 DELETE 接線**
+- [x] **Step 4: bundles — `upsertBundle` 與 DELETE 接線**
 
 在 `upsertBundle` 內，`const supabase = createSupabaseAdminClient();` 的下一行插入：
 
@@ -821,12 +821,12 @@ async function fetchBundleSnapshot(
   });
 ```
 
-- [ ] **Step 5: 型別檢查與建置**
+- [x] **Step 5: 型別檢查與建置**
 
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
 
-- [ ] **Step 6: 手動驗證**
+- [x] **Step 6: 手動驗證**
 
 `npm run dev` 後在 `/manager/products` 的口味與組合價區塊各新增、修改、刪除一次，然後查：
 
@@ -835,7 +835,7 @@ npx supabase db query "select entity, action, entity_label from public.audit_log
 ```
 Expected: 六列，兩個 entity 各三種 action。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/api/flavors/route.ts app/api/bundles/route.ts
@@ -855,7 +855,7 @@ git commit -m "feat: audit flavor and bundle changes"
 - Consumes: `writeAuditLog`（Task 3）
 - Produces: `app/api/counters/route.ts` 內部的 `fetchCounterSnapshot(supabase, counterId)`，回傳 `counters` 資料列加上 `monthlyTargets` 陣列
 
-- [ ] **Step 1: discounts 接線**
+- [x] **Step 1: discounts 接線**
 
 在 import 區塊加入 `import { writeAuditLog } from "@/lib/backend/audit";`。
 
@@ -903,7 +903,7 @@ PATCH：在 `const supabase = createSupabaseAdminClient();` 下一行插入 `con
   });
 ```
 
-- [ ] **Step 2: payment-methods 接線**
+- [x] **Step 2: payment-methods 接線**
 
 在 import 區塊加入 `import { writeAuditLog } from "@/lib/backend/audit";`。
 
@@ -958,7 +958,7 @@ PATCH：在 `const supabase = createSupabaseAdminClient();` 下一行插入：
   });
 ```
 
-- [ ] **Step 3: counters 接線**
+- [x] **Step 3: counters 接線**
 
 在 import 區塊加入 `import { writeAuditLog } from "@/lib/backend/audit";`。
 
@@ -1047,12 +1047,12 @@ DELETE：在 `const supabase = createSupabaseAdminClient();` 下一行插入 `co
   });
 ```
 
-- [ ] **Step 4: 型別檢查與建置**
+- [x] **Step 4: 型別檢查與建置**
 
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
 
-- [ ] **Step 5: 手動驗證**
+- [x] **Step 5: 手動驗證**
 
 `npm run dev` 後在 `/manager/products` 折扣區塊、`/manager/payment-methods`、`/manager/counters` 各做一次新增與修改，然後查：
 
@@ -1061,7 +1061,7 @@ npx supabase db query "select entity, action, entity_label from public.audit_log
 ```
 Expected: 至少六列，三個 entity 都有 `create` 與 `update`。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/api/discounts/route.ts app/api/payment-methods/route.ts app/api/counters/route.ts
@@ -1084,7 +1084,7 @@ git commit -m "feat: audit discount, payment method and counter changes"
 
 > **安全要求：** staff 快照只能來自 `profiles` 資料列。`UpsertStaffInput` 帶有 `password`，任何情況下都不得把 request input 放進 `before` / `after`。
 
-- [ ] **Step 1: staff — 加入 import 與快照函式**
+- [x] **Step 1: staff — 加入 import 與快照函式**
 
 在 import 區塊加入 `import { writeAuditLog } from "@/lib/backend/audit";`。
 
@@ -1107,7 +1107,7 @@ async function fetchStaffSnapshot(
 }
 ```
 
-- [ ] **Step 2: staff — 三個 mutation 接線**
+- [x] **Step 2: staff — 三個 mutation 接線**
 
 POST：在 `profileError` 檢查之後、`return` 之前插入：
 
@@ -1163,7 +1163,7 @@ DELETE：在 `const supabase = createSupabaseAdminClient();` 下一行插入 `co
   });
 ```
 
-- [ ] **Step 3: commission — 加入 import 與快照函式**
+- [x] **Step 3: commission — 加入 import 與快照函式**
 
 在 import 區塊加入 `import { writeAuditLog } from "@/lib/backend/audit";`。
 
@@ -1228,7 +1228,7 @@ async function fetchCommissionLabel(
 }
 ```
 
-- [ ] **Step 4: commission — PUT 接線**
+- [x] **Step 4: commission — PUT 接線**
 
 在 PUT 內，`const supabase = createSupabaseAdminClient();` 的下一行插入：
 
@@ -1250,12 +1250,12 @@ async function fetchCommissionLabel(
   });
 ```
 
-- [ ] **Step 5: 型別檢查與建置**
+- [x] **Step 5: 型別檢查與建置**
 
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
 
-- [ ] **Step 6: 驗證快照不含密碼**
+- [x] **Step 6: 驗證快照不含密碼**
 
 `npm run dev` 後在 `/manager/staff` 新增一位測試員工（需填密碼），然後查：
 
@@ -1264,7 +1264,7 @@ npx supabase db query "select after from public.audit_logs where entity = 'profi
 ```
 Expected: JSON 內容為 `id / display_name / role / salary_type / hourly_wage / monthly_salary / is_active / commission_mode`，**不含任何 password 欄位**。這一步不通過就不能往下走。
 
-- [ ] **Step 7: 驗證抽成紀錄**
+- [x] **Step 7: 驗證抽成紀錄**
 
 在 `/manager/staff` 調整抽成級距後查：
 
@@ -1273,7 +1273,7 @@ npx supabase db query "select entity_id, entity_label, before, after from public
 ```
 Expected: `entity_id` 為 `global` 或員工 uuid，`entity_label` 為「全域」或員工姓名，`before` / `after` 都是 `{"tiers": [...], "commissionMode": ...}` 形狀的物件。
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add app/api/staff/route.ts app/api/commission/route.ts
@@ -1293,7 +1293,7 @@ git commit -m "feat: audit staff and commission changes"
 
 > **只實作 GET。** 不得加入 POST / PATCH / DELETE。
 
-- [ ] **Step 1: 實作**
+- [x] **Step 1: 實作**
 
 建立 `app/api/audit/route.ts`：
 
@@ -1370,12 +1370,12 @@ export async function GET(request: Request) {
 }
 ```
 
-- [ ] **Step 2: 型別檢查與建置**
+- [x] **Step 2: 型別檢查與建置**
 
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
 
-- [ ] **Step 3: 驗證權限與篩選**
+- [x] **Step 3: 驗證權限與篩選**
 
 `npm run dev`，以**店員**身分登入後於瀏覽器 console 執行 `await fetch("/api/audit").then((r) => r.status)`。
 Expected: `403`。
@@ -1383,7 +1383,7 @@ Expected: `403`。
 改以**店長**身分登入後執行 `await fetch("/api/audit?entity=products").then((r) => r.json())`。
 Expected: `ok: true`，`data.logs` 只含 `entity` 為 `products` 的紀錄，且依 `createdAt` 由新到舊。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add app/api/audit/route.ts
@@ -1403,7 +1403,7 @@ git commit -m "feat: add read-only audit log API"
 - Consumes: `GET /api/audit`（Task 8）、`GET /api/staff`（既有，用來填操作人下拉選單）、`diffRecords` / `auditEntityLabel` / `formatAuditValue`（Task 1）
 - Produces: 導覽列新增 `{ href: "/manager/audit", label: "紀錄" }`
 
-- [ ] **Step 1: 加入導覽列項目**
+- [x] **Step 1: 加入導覽列項目**
 
 修改 `components/shared/nav-links.ts`，在 `managerNavLinks` 的 `{ href: "/manager/staff", label: "員工" }` 之後加入一行：
 
@@ -1411,7 +1411,7 @@ git commit -m "feat: add read-only audit log API"
   { href: "/manager/audit", label: "紀錄" }
 ```
 
-- [ ] **Step 2: 建立頁面**
+- [x] **Step 2: 建立頁面**
 
 建立 `app/manager/audit/page.tsx`：
 
@@ -1428,7 +1428,7 @@ export default function ManagerAuditPage() {
 }
 ```
 
-- [ ] **Step 3: 建立元件**
+- [x] **Step 3: 建立元件**
 
 建立 `components/manager/AuditLogView.tsx`：
 
@@ -1699,14 +1699,14 @@ export function AuditLogView() {
 }
 ```
 
-- [ ] **Step 4: 驗證 `/api/staff` 的回傳形狀未變**
+- [x] **Step 4: 驗證 `/api/staff` 的回傳形狀未變**
 
 Step 3 的 `.map()` 依賴 `/api/staff` GET 回傳 `data.staff` 陣列、每項含 `id` 與 `displayName`（已於撰寫本計畫時確認，見 `app/api/staff/route.ts` GET 的回傳映射）。
 
 Run: `grep -n "displayName: profile.display_name" app/api/staff/route.ts`
 Expected: 有一列命中。若沒有命中代表該路由回傳形狀已改，請依實際欄位名調整 Step 3 的 `.map()`，**不要**反過來修改 `app/api/staff/route.ts` 去遷就這個頁面。
 
-- [ ] **Step 5: 補上 `.audit-changes` 樣式**
+- [x] **Step 5: 補上 `.audit-changes` 樣式**
 
 本頁使用的 `panel` / `data-card` / `panel-header` / `pill` / `field-row` / `table-scroll` / `secondary-action` / `slim` 都是專案既有類名，不需新增。只有展開明細用的 `audit-changes` 是新的。
 
@@ -1725,7 +1725,7 @@ Expected: 有一列命中。若沒有命中代表該路由回傳形狀已改，�
 Run: `grep -c "audit-changes" app/globals.css`
 Expected: `1`。
 
-- [ ] **Step 6: 建置與手動驗證**
+- [x] **Step 6: 建置與手動驗證**
 
 Run: `npx tsc --noEmit && npm run build`
 Expected: 兩者皆無錯誤。
@@ -1739,7 +1739,7 @@ Expected: 兩者皆無錯誤。
 以店員身分開啟 `/manager/audit`。
 Expected: 被既有的 manager 權限機制擋下（與其他 `/manager/*` 頁一致）。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/manager/audit/page.tsx components/manager/AuditLogView.tsx components/shared/nav-links.ts app/globals.css
@@ -1757,17 +1757,17 @@ git commit -m "feat: add manager audit log page"
 - Consumes: Task 1–9 的全部產出
 - Produces: 無新介面
 
-- [ ] **Step 1: 全套測試**
+- [x] **Step 1: 全套測試**
 
 Run: `npm run test`
 Expected: 全綠，含 Task 1 新增的 `audit-diff.test.ts`。
 
-- [ ] **Step 2: 建置**
+- [x] **Step 2: 建置**
 
 Run: `npm run build`
 Expected: 成功，無型別錯誤與 lint 錯誤。
 
-- [ ] **Step 3: 確認八組路由都接上了**
+- [x] **Step 3: 確認八組路由都接上了**
 
 Run:
 ```bash
@@ -1775,7 +1775,7 @@ grep -L "writeAuditLog" app/api/products/route.ts app/api/flavors/route.ts app/a
 ```
 Expected: **沒有任何輸出**。有輸出就代表該檔案漏接。
 
-- [ ] **Step 4: 確認沒有意外開放寫入**
+- [x] **Step 4: 確認沒有意外開放寫入**
 
 Run: `grep -rn "audit_logs" app/api/ | grep -v "app/api/audit/route.ts"`
 Expected: **沒有任何輸出**。除了 `lib/backend/audit.ts` 之外，不應有其他地方直接操作 `audit_logs`。
@@ -1783,7 +1783,7 @@ Expected: **沒有任何輸出**。除了 `lib/backend/audit.ts` 之外，不應
 Run: `grep -n "export async function" app/api/audit/route.ts`
 Expected: 只有 `export async function GET`。
 
-- [ ] **Step 5: 端對端手動驗收**
+- [x] **Step 5: 端對端手動驗收**
 
 `npm run db:reset && npm run dev`，以店長身分依序執行並在 `/manager/audit` 確認：
 
@@ -1795,7 +1795,7 @@ Expected: 只有 `export async function GET`。
 6. 調整抽成級距 → 出現「修改／抽成」，對象顯示員工姓名或「全域」。
 7. 以店員身分呼叫 `/api/audit` → 403。
 
-- [ ] **Step 6: 勾選計畫並 commit**
+- [x] **Step 6: 勾選計畫並 commit**
 
 把本計畫檔中已完成的項目打勾，然後：
 
@@ -1812,3 +1812,35 @@ git commit -m "docs: mark audit log plan complete"
 - **極端情況可能漏記。** `writeAuditLog` 刻意吞掉錯誤以保護主操作，資料庫寫入失敗時只留 `console.error`。
 - **未涵蓋** `app/api/counters/records/route.ts`（櫃位月目標的獨立端點）與 `app/api/inventory/sort/route.ts`（排序），依 spec 議定不在本次範圍。
 - **`products` / `flavors` / `counters` / `profiles` 的 DELETE 仍會靜默降級成停用。** 本階段只如實記錄該行為（記為 `update`），修正留給階段二的軟刪除。
+
+---
+
+## 執行狀態（2026-08-25，全數驗收完成）
+
+九個 Task 全部實作並**在本機 Supabase 實跑驗證通過**。
+
+自動化：`npm run test` 50 passed／`npm run build` 成功／`npx tsc --noEmit` exit 0／八組路由無漏接／`audit_logs` 未被 audit 以外路由碰觸／`/api/audit` 只有 GET。
+
+實跑驗證（本機 Supabase，`supabase migration up --local`）：
+
+| # | 項目 | 結果 |
+|---|---|---|
+| 1 | migration 套用 | ✅ `202608250001_audit_logs` applied |
+| 2 | append-only | ✅ 僅一條 `polcmd = 'r'` policy |
+| 3 | 商品 create／update／delete 留痕，操作人正確 | ✅ `actor_name = 店長` |
+| 4 | 只改價格 → 明細只有一列 | ✅ `價格：450 → 480` |
+| 5 | 只改禮盒規則 → **不是**「無欄位變更」 | ✅ 顯示「禮盒規則」 |
+| 6 | **員工快照不含密碼** | ✅ 全表 0 筆含 password／密碼原文／email |
+| 7 | 抽成 `entity_id=global`、label`全域`、`{tiers, commissionMode}` | ✅ |
+| 8 | 店員 `/api/audit` → 403；未登入 → 401 | ✅ |
+| 9 | `/manager/audit` 店長 200、店員 307 導向 `/pos` | ✅ |
+
+額外做的資料庫層驗證（比原計畫更嚴格）：
+
+- 店員 JWT 直接打 PostgREST 讀 `audit_logs` → `[]`（RLS 濾掉）
+- 店長 JWT 直接 INSERT → `42501 permission denied`
+- 店長 JWT 直接 DELETE → `42501 permission denied`，事後筆數不變
+- 八個 entity 的適用 action 全部覆蓋（products／flavors／bundles／counters／profiles 各含 delete）
+- **刪除後 `entity_label` 仍保留**：商品已從 `products` 消失，稽核紀錄仍查得到名稱——即本次需求的起因情境
+
+驗證用的測試資料已清理：測試員工帳號已刪除、測試折扣與付款方式已移除、全域抽成級距已還原為原值（`3000/0.01`、`5001/0.02`）。本機 `audit_logs` 留有驗證過程產生的紀錄，`npm run db:reset` 即可清空。
