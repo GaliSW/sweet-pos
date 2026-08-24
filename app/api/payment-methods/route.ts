@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { UpsertPaymentMethodInput } from "@/lib/backend/api-types";
 import { requireRole } from "@/lib/auth/guards";
+import { writeAuditLog } from "@/lib/backend/audit";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 import { defaultPaymentMethods } from "@/lib/domain/payment-methods";
 
@@ -71,6 +72,16 @@ export async function POST(request: Request) {
   });
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "create",
+    entity: "payment_methods",
+    entityId: code,
+    entityLabel: input.name.trim(),
+    after: await fetchPaymentMethodSnapshot(supabase, code)
+  });
+
   return NextResponse.json({ ok: true, data: { code, source: "supabase" } });
 }
 
@@ -90,6 +101,7 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchPaymentMethodSnapshot(supabase, input.code);
 
   if (input.isActive === false) {
     const { count, error: countError } = await supabase
@@ -122,6 +134,17 @@ export async function PATCH(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "update",
+    entity: "payment_methods",
+    entityId: input.code,
+    entityLabel: input.name.trim(),
+    before: beforeSnapshot,
+    after: await fetchPaymentMethodSnapshot(supabase, input.code)
+  });
+
   return NextResponse.json({ ok: true, data: { code: data.code, source: "supabase" } });
 }
 
@@ -134,4 +157,18 @@ function validateInput(input: UpsertPaymentMethodInput) {
     return { ok: false as const, error: "排序必須是整數" };
   }
   return { ok: true as const };
+}
+
+// payment_methods 的主鍵是 code(text),不是 uuid。
+async function fetchPaymentMethodSnapshot(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  code: string
+) {
+  const { data } = await supabase
+    .from("payment_methods")
+    .select("code, name, is_active, sort_order")
+    .eq("code", code)
+    .maybeSingle();
+
+  return data ?? null;
 }

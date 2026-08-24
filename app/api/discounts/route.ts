@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { UpsertDiscountInput } from "@/lib/backend/api-types";
 import { requireRole } from "@/lib/auth/guards";
+import { writeAuditLog } from "@/lib/backend/audit";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
 import { discounts as sampleDiscounts } from "@/lib/domain/sample-data";
 
@@ -81,6 +82,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
 
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "create",
+    entity: "discounts",
+    entityId: data.id as string,
+    entityLabel: input.name.trim(),
+    after: await fetchDiscountSnapshot(supabase, data.id as string)
+  });
+
   return NextResponse.json({
     ok: true,
     data: { discountId: data.id, source: "supabase" }
@@ -112,6 +122,7 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createSupabaseAdminClient();
+  const beforeSnapshot = await fetchDiscountSnapshot(supabase, input.id);
   const { data, error } = await supabase
     .from("discounts")
     .update(toRow(input))
@@ -122,6 +133,16 @@ export async function PATCH(request: Request) {
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }
+
+  await writeAuditLog(supabase, {
+    actor: guard.profile ?? null,
+    action: "update",
+    entity: "discounts",
+    entityId: input.id,
+    entityLabel: input.name.trim(),
+    before: beforeSnapshot,
+    after: await fetchDiscountSnapshot(supabase, input.id)
+  });
 
   return NextResponse.json({
     ok: true,
@@ -160,4 +181,17 @@ function validateDiscountInput(input: UpsertDiscountInput) {
   }
 
   return { ok: true as const };
+}
+
+async function fetchDiscountSnapshot(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  discountId: string
+) {
+  const { data } = await supabase
+    .from("discounts")
+    .select("*")
+    .eq("id", discountId)
+    .maybeSingle();
+
+  return data ?? null;
 }
