@@ -837,9 +837,11 @@ export function PosRegister() {
                     onClick={() => toggleFlavor(flavor.name)}
                     type="button"
                   >
-                    <span>
-                      {flavor.name}
-                      {stock != null ? `（庫存 ${stock}）` : ""}
+                    <span className="flavor-btn-text">
+                      <span className="flavor-btn-name">{flavor.name}</span>
+                      {stock != null ? (
+                        <span className="flavor-btn-stock">庫存 {stock}</span>
+                      ) : null}
                     </span>
                     <strong>{countFlavor(selectedFlavors, flavor.name)}</strong>
                   </button>

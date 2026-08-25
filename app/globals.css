@@ -886,12 +886,12 @@ select:focus-visible {
 .flavor-grid {
   padding: 16px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
   gap: 10px;
 }
 
 .flavor-btn {
-  min-height: 50px;
+  min-height: 56px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: var(--soft);
@@ -900,8 +900,35 @@ select:focus-visible {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 10px 12px;
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+/* 口味名稱與庫存分成兩行,長名稱才不會與庫存黏成一串折行。 */
+.flavor-btn-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.flavor-btn-name {
+  overflow-wrap: anywhere;
+}
+
+.flavor-btn-stock {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.flavor-btn.active .flavor-btn-stock {
+  color: inherit;
+  opacity: 0.75;
 }
 
 .flavor-btn:hover {
@@ -927,6 +954,19 @@ select:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* 彈窗內的提示是整句話,不是短標籤:給它左右內縮、可換行的區塊樣式,
+   而不是沿用藥丸標籤那種零上下 padding 的排版。 */
+.modal > .status {
+  display: flex;
+  align-items: flex-start;
+  margin: 0 16px 4px;
+  padding: 8px 12px;
+  min-height: 0;
+  border-radius: var(--radius-sm);
+  line-height: 1.55;
+  text-align: left;
+}
+
 .selected-flavor-list {
   min-height: 48px;
   padding: 0 16px 16px;
@@ -941,7 +981,9 @@ select:focus-visible {
 .selected-flavor-chip {
   min-height: 32px;
   border-radius: 999px;
-  padding: 0 12px;
+  padding: 5px 12px;
+  line-height: 1.4;
+  text-align: left;
   background: var(--accent-soft);
   border: 1px solid transparent;
   color: var(--accent-strong);
