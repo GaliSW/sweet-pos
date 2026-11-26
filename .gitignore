@@ -21,3 +21,4 @@ pnpm-workspace.yaml
 
 # TypeScript 建置快取
 tsconfig.tsbuildinfo
+.gstack/
