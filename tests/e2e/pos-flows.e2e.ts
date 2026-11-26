@@ -376,8 +376,101 @@ describe("庫存:批次進貨 / 交班盤點 / 固定禮盒獨立庫存", () => 
   });
 });
 
+describe("庫存異動類型自訂", () => {
+  // 類型是全域設定且沒有刪除 API(歷史紀錄要能對回類型),測試結束時停用。
+  let customCode = "";
+
+  it("店長新增自訂扣庫存類型,店員登記後扣庫存並列入覆核", async () => {
+    const created = await manager.post("/api/inventory-movement-types", {
+      name: `E2E公關試吃${Date.now() % 100000}`,
+      direction: "decrease",
+      noteRequired: true,
+      needsReview: true
+    });
+
+    expect(created.ok).toBe(true);
+    customCode = (created.data as any).code;
+
+    const before = await stockOf("包種烏龍");
+    const missingNote = await staff.post("/api/inventory", {
+      counterId,
+      flavorId: SEED.flavorOolong,
+      movementType: customCode,
+      quantity: 2
+    });
+    expect(missingNote.ok).toBe(false);
+
+    const result = await staff.post("/api/inventory", {
+      counterId,
+      flavorId: SEED.flavorOolong,
+      movementType: customCode,
+      quantity: 2,
+      note: "e2e 自訂類型"
+    });
+
+    expect(result.ok).toBe(true);
+    expect(await stockOf("包種烏龍")).toBe(before - 2);
+
+    const inventory = await manager.get(`/api/inventory?counterId=${counterId}`);
+    const movement = ((inventory.data as any).movements as any[]).find(
+      (entry) => entry.movementType === customCode
+    );
+    expect(movement.quantity).toBe(-2);
+    expect(movement.needsReview).toBe(true);
+    expect(movement.movementLabel).toMatch(/^E2E公關試吃/);
+  });
+
+  it("停用後不可再登記;系統類型不可改名或停用;員工不可新增類型", async () => {
+    const types = await manager.get("/api/inventory-movement-types");
+    const custom = ((types.data as any).movementTypes as any[]).find(
+      (type) => type.code === customCode
+    );
+
+    const disabled = await manager.patch("/api/inventory-movement-types", {
+      ...custom,
+      isActive: false
+    });
+    expect(disabled.ok).toBe(true);
+
+    const rejected = await staff.post("/api/inventory", {
+      counterId,
+      flavorId: SEED.flavorOolong,
+      movementType: customCode,
+      quantity: 1,
+      note: "停用後"
+    });
+    expect(rejected.ok).toBe(false);
+
+    await manager.patch("/api/inventory-movement-types", {
+      code: "opening_count",
+      name: "被改掉",
+      isActive: false
+    });
+    const after = await manager.get("/api/inventory-movement-types");
+    const opening = ((after.data as any).movementTypes as any[]).find(
+      (type) => type.code === "opening_count"
+    );
+    expect(opening.name).toBe("開班盤點");
+    expect(opening.isActive).toBe(true);
+
+    const staffCreate = await staff.post("/api/inventory-movement-types", {
+      name: "員工亂加",
+      direction: "decrease"
+    });
+    expect(staffCreate.ok).toBe(false);
+
+    const saleManual = await staff.post("/api/inventory", {
+      counterId,
+      flavorId: SEED.flavorOolong,
+      movementType: "sale",
+      quantity: 1
+    });
+    expect(saleManual.ok).toBe(false);
+  });
+});
+
 describe("報表與作廢", () => {
-  it("報表(限定測試櫃):共班金額各半、折讓含組合與手動扣款", async () => {
+  it("報表(限定測試櫃):業績歸登記者、折讓含組合與手動扣款", async () => {
     const result = await manager.get(
       `/api/reports?from=2000-01-01&to=${taipeiToday()}&counterId=${counterId}`
     );

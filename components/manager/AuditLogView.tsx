@@ -32,6 +32,7 @@ const ENTITY_OPTIONS = [
   "counters",
   "profiles",
   "payment_methods",
+  "inventory_movement_types",
   "commission_tiers"
 ];
 

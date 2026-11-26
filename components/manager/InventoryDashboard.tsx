@@ -13,6 +13,7 @@ type Movement = {
   itemSpec: string;
   movementType: InventoryMovementType;
   movementLabel: string;
+  needsReview: boolean;
   quantity: number;
   countedQuantity: number | null;
   note: string | null;
@@ -34,7 +35,6 @@ type SummaryRow = {
   stock: number;
 };
 
-const reviewTypes = new Set<InventoryMovementType>(["waste", "adjustment", "sampling"]);
 
 export function InventoryDashboard() {
   const [counters, setCounters] = useState(fallbackCounters);
@@ -353,7 +353,7 @@ export function InventoryDashboard() {
                   <td>
                     {movement.reviewedAt ? (
                       <span className="status">{movement.reviewedByName} 已覆核</span>
-                    ) : reviewTypes.has(movement.movementType) ? (
+                    ) : movement.needsReview ? (
                       <span className="status warn">待覆核</span>
                     ) : (
                       "-"
@@ -361,7 +361,7 @@ export function InventoryDashboard() {
                   </td>
                   <td>
                     <div className="toolbar">
-                      {!movement.reviewedAt && reviewTypes.has(movement.movementType) ? (
+                      {!movement.reviewedAt && movement.needsReview ? (
                         <button
                           className="secondary-action"
                           disabled={working}

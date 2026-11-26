@@ -17,6 +17,7 @@ const ENTITY_LABELS: Record<string, string> = {
   counters: "櫃位",
   profiles: "員工",
   payment_methods: "付款方式",
+  inventory_movement_types: "庫存異動類型",
   commission_tiers: "抽成"
 };
 
@@ -55,7 +56,12 @@ const FIELD_LABELS: Record<string, string> = {
   // commission
   commissionMode: "抽成模式",
   // payment_methods
-  code: "代碼"
+  code: "代碼",
+  // inventory_movement_types
+  direction: "庫存方向",
+  note_required: "必填備註",
+  needs_review: "店長覆核",
+  is_system: "系統內建"
 };
 
 export function auditEntityLabel(entity: string): string {

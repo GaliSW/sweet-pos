@@ -12,6 +12,7 @@ export const managerNavLinks = [
   { href: "/manager/schedule", label: "排班" },
   { href: "/manager/payroll", label: "薪資" },
   { href: "/manager/inventory", label: "庫存" },
+  { href: "/manager/movement-types", label: "異動" },
   { href: "/manager/products", label: "商品" },
   { href: "/manager/counters", label: "櫃位" },
   { href: "/manager/payment-methods", label: "付款" },

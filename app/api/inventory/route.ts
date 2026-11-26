@@ -1,36 +1,23 @@
 import { NextResponse } from "next/server";
 import type {
   CreateInventoryMovementInput,
-  InventoryMovementType,
+  InventoryMovementTypeOption,
   UpdateInventoryMovementInput
 } from "@/lib/backend/api-types";
 import { requireRole } from "@/lib/auth/guards";
+import { mapMovementType, movementTypeSelect } from "@/lib/backend/movement-types";
 import { relationDisplayName } from "@/lib/backend/query-helpers";
 import { createSupabaseAdminClient, hasSupabaseAdminEnv } from "@/lib/db/server";
-import { normalizeInventoryQuantity } from "@/lib/domain/inventory";
+import {
+  defaultInventoryMovementTypes,
+  normalizeInventoryQuantity,
+  SALE_MOVEMENT_CODE
+} from "@/lib/domain/inventory";
 
 const defaultStaffId = "00000000-0000-4000-8000-000000000001";
-const countTypes = new Set<InventoryMovementType>([
-  "opening_count",
-  "closing_count",
-  "handover_count"
-]);
-const noteRequiredTypes = new Set<InventoryMovementType>(["sampling", "waste", "adjustment"]);
-
-const movementLabels: Record<InventoryMovementType, string> = {
-  opening_count: "開班盤點",
-  closing_count: "下班盤點",
-  handover_count: "交班盤點",
-  purchase: "進貨",
-  sampling: "試吃",
-  waste: "報廢",
-  adjustment: "轉調",
-  preorder_pickup: "預購取貨",
-  sale: "銷售"
-};
 
 const movementSelect =
-  "id, counter_id, product_id, flavor_id, movement_type, quantity, counted_quantity, note, created_by, created_at, updated_at, reviewed_at, counters(name), products(name, spec, sort_order), flavors(name, spec, sort_order), created_profile:profiles!inventory_movements_created_by_fkey(display_name), updated_profile:profiles!inventory_movements_updated_by_fkey(display_name), reviewed_profile:profiles!inventory_movements_reviewed_by_fkey(display_name)";
+  "id, counter_id, product_id, flavor_id, movement_type, quantity, counted_quantity, note, created_by, created_at, updated_at, reviewed_at, counters(name), products(name, spec, sort_order), flavors(name, spec, sort_order), created_profile:profiles!inventory_movements_created_by_fkey(display_name), updated_profile:profiles!inventory_movements_updated_by_fkey(display_name), reviewed_profile:profiles!inventory_movements_reviewed_by_fkey(display_name), movement_type_info:inventory_movement_types(name, needs_review)";
 
 type InventorySummaryRow = {
   counter_id: string;
@@ -99,8 +86,9 @@ export async function GET(request: Request) {
       itemName: isFlavor ? relationName(movement.flavors) : relationName(movement.products),
       itemSpec: isFlavor ? relationSpec(movement.flavors) : relationSpec(movement.products),
       itemSortOrder: relationSortOrder(isFlavor ? movement.flavors : movement.products),
-      movementType: movement.movement_type as InventoryMovementType,
-      movementLabel: movementLabels[movement.movement_type as InventoryMovementType],
+      movementType: movement.movement_type,
+      movementLabel: relationName(movement.movement_type_info),
+      needsReview: relationNeedsReview(movement.movement_type_info),
       quantity: movement.quantity,
       countedQuantity: movement.counted_quantity,
       note: movement.note,
@@ -203,13 +191,20 @@ export async function POST(request: Request) {
     });
   }
 
-  const validation = validateInventoryInput(input);
+  const supabase = hasSupabaseAdminEnv() ? createSupabaseAdminClient() : null;
+  const movementType = await resolveSelectableType(supabase, input.movementType);
+
+  if (!movementType.ok) {
+    return NextResponse.json(movementType, { status: 400 });
+  }
+
+  const validation = validateInventoryInput(input, movementType.type);
 
   if (!validation.ok) {
     return NextResponse.json(validation, { status: 400 });
   }
 
-  if (!hasSupabaseAdminEnv()) {
+  if (!supabase) {
     return NextResponse.json({
       ok: true,
       data: {
@@ -219,8 +214,10 @@ export async function POST(request: Request) {
     });
   }
 
-  const supabase = createSupabaseAdminClient();
-  const normalizedQuantity = normalizeInventoryQuantity(input.movementType, input.quantity);
+  const normalizedQuantity = normalizeInventoryQuantity(
+    movementType.type.direction,
+    input.quantity
+  );
 
   const { data, error } = await supabase
     .from("inventory_movements")
@@ -305,29 +302,31 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: false, error: "缺少異動類型" }, { status: 400 });
   }
 
+  // 類型沒換時允許沿用已停用的類型;換成別的類型則必須是可選的啟用類型。
+  const movementType =
+    input.movementType === permission.movementType
+      ? await resolveMovementType(supabase, input.movementType)
+      : await resolveSelectableType(supabase, input.movementType);
+
+  if (!movementType.ok) {
+    return NextResponse.json(movementType, { status: 400 });
+  }
+
   if (!Number.isFinite(Number(input.quantity))) {
     return NextResponse.json({ ok: false, error: "異動數量必須是數字" }, { status: 400 });
   }
 
-  if (countTypes.has(input.movementType) && !Number.isFinite(Number(input.countedQuantity))) {
-    return NextResponse.json(
-      { ok: false, error: "盤點類異動需要填實際盤點庫存" },
-      { status: 400 }
-    );
-  }
+  const typeValidation = validateTypeRequirements(input, movementType.type);
 
-  if (noteRequiredTypes.has(input.movementType) && !input.note?.trim()) {
-    return NextResponse.json(
-      { ok: false, error: "試吃、報廢與轉調需要填寫原因 / 備註" },
-      { status: 400 }
-    );
+  if (!typeValidation.ok) {
+    return NextResponse.json(typeValidation, { status: 400 });
   }
 
   const { data, error } = await supabase
     .from("inventory_movements")
     .update({
       movement_type: input.movementType,
-      quantity: normalizeInventoryQuantity(input.movementType, Number(input.quantity)),
+      quantity: normalizeInventoryQuantity(movementType.type.direction, Number(input.quantity)),
       counted_quantity: input.countedQuantity ?? null,
       note: input.note?.trim() || null,
       updated_by: guard.profile?.id ?? null,
@@ -394,7 +393,7 @@ async function checkMovementPermission(
 ) {
   const { data: movement, error } = await supabase
     .from("inventory_movements")
-    .select("id, created_by")
+    .select("id, created_by, movement_type")
     .eq("id", movementId)
     .single();
 
@@ -406,10 +405,66 @@ async function checkMovementPermission(
     return { ok: false as const, error: "只能修改自己建立的紀錄", status: 403 };
   }
 
-  return { ok: true as const, status: 200 };
+  return { ok: true as const, status: 200, movementType: String(movement.movement_type) };
 }
 
-function validateInventoryInput(input: CreateInventoryMovementInput) {
+async function resolveMovementType(
+  supabase: ReturnType<typeof createSupabaseAdminClient> | null,
+  code: string | undefined
+) {
+  if (!code) return { ok: false as const, error: "缺少異動類型" };
+
+  let type: InventoryMovementTypeOption | undefined;
+
+  if (supabase) {
+    const { data } = await supabase
+      .from("inventory_movement_types")
+      .select(movementTypeSelect)
+      .eq("code", code)
+      .maybeSingle();
+    type = data ? mapMovementType(data) : undefined;
+  } else {
+    type = defaultInventoryMovementTypes.find((candidate) => candidate.code === code);
+  }
+
+  if (!type) return { ok: false as const, error: "找不到異動類型" };
+  return { ok: true as const, type };
+}
+
+// 手動新增 / 改成的類型必須啟用中,且不可是只由 POS 結帳寫入的銷售。
+async function resolveSelectableType(
+  supabase: ReturnType<typeof createSupabaseAdminClient> | null,
+  code: string | undefined
+) {
+  const result = await resolveMovementType(supabase, code);
+
+  if (!result.ok) return result;
+  if (result.type.code === SALE_MOVEMENT_CODE) {
+    return { ok: false as const, error: "銷售異動只能由 POS 結帳產生" };
+  }
+  if (!result.type.isActive) {
+    return { ok: false as const, error: `異動類型「${result.type.name}」已停用` };
+  }
+  return result;
+}
+
+function validateTypeRequirements(
+  input: { countedQuantity?: number | null; note?: string },
+  type: InventoryMovementTypeOption
+) {
+  if (type.direction === "count" && !Number.isFinite(Number(input.countedQuantity))) {
+    return { ok: false as const, error: "盤點類異動需要填實際盤點庫存" };
+  }
+  if (type.noteRequired && !input.note?.trim()) {
+    return { ok: false as const, error: `「${type.name}」需要填寫原因 / 備註` };
+  }
+  return { ok: true as const };
+}
+
+function validateInventoryInput(
+  input: CreateInventoryMovementInput,
+  type: InventoryMovementTypeOption
+) {
   if (!input.counterId) return { ok: false as const, error: "缺少櫃位" };
 
   const hasProduct = Boolean(input.productId);
@@ -419,24 +474,22 @@ function validateInventoryInput(input: CreateInventoryMovementInput) {
     return { ok: false as const, error: "品項必須是袋裝商品或禮盒口味其中一種" };
   }
 
-  if (!input.movementType) return { ok: false as const, error: "缺少異動類型" };
   if (!Number.isFinite(Number(input.quantity))) {
     return { ok: false as const, error: "異動數量必須是數字" };
   }
-  if (countTypes.has(input.movementType) && !Number.isFinite(Number(input.countedQuantity))) {
-    return { ok: false as const, error: "盤點類異動需要填實際盤點庫存" };
-  }
-  if (noteRequiredTypes.has(input.movementType) && !input.note?.trim()) {
-    return { ok: false as const, error: "試吃、報廢與轉調需要填寫原因 / 備註" };
-  }
 
-  return { ok: true as const };
+  return validateTypeRequirements(input, type);
 }
 
 function relationName(value: unknown) {
   if (Array.isArray(value)) return value[0]?.name ?? "";
   if (value && typeof value === "object" && "name" in value) return String(value.name);
   return "";
+}
+
+function relationNeedsReview(value: unknown) {
+  const record = Array.isArray(value) ? value[0] : value;
+  return Boolean(record && typeof record === "object" && "needs_review" in record && record.needs_review);
 }
 
 function relationSpec(value: unknown) {

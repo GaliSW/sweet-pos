@@ -37,16 +37,31 @@ export type ApiResult<T> =
       error: string;
     };
 
-export type InventoryMovementType =
-  | "opening_count"
-  | "closing_count"
-  | "handover_count"
-  | "purchase"
-  | "sampling"
-  | "waste"
-  | "adjustment"
-  | "preorder_pickup"
-  | "sale";
+// 異動類型由 inventory_movement_types 表設定,值為該表的 code。
+export type InventoryMovementType = string;
+
+export type InventoryMovementDirection = "increase" | "decrease" | "count";
+
+export type InventoryMovementTypeOption = {
+  code: string;
+  name: string;
+  direction: InventoryMovementDirection;
+  noteRequired: boolean;
+  needsReview: boolean;
+  isSystem: boolean;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+export type UpsertInventoryMovementTypeInput = {
+  code?: string;
+  name: string;
+  direction?: InventoryMovementDirection;
+  noteRequired?: boolean;
+  needsReview?: boolean;
+  isActive?: boolean;
+  sortOrder?: number;
+};
 
 export type CreateInventoryMovementInput = {
   counterId: string;

@@ -2075,3 +2075,104 @@ tbody tr:last-child td {
   font-size: 13px;
   color: var(--muted);
 }
+
+/* 庫存異動類型設定:表格內的輸入、下拉、勾選與排序按鈕 */
+.type-settings :is(th, td) {
+  padding-left: 7px;
+  padding-right: 7px;
+}
+
+.type-settings td {
+  white-space: nowrap;
+}
+
+.type-settings td input[type="text"],
+.type-settings td select {
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  background: #fff;
+  color: var(--ink);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.type-settings td input[type="text"] {
+  width: 100%;
+  min-width: 96px;
+}
+
+.type-settings td input[type="text"]:focus,
+.type-settings td select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.type-settings td select:disabled {
+  background: var(--soft);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+.type-settings input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent-strong);
+  cursor: pointer;
+}
+
+.type-settings input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
+.type-settings .check-cell {
+  text-align: center;
+}
+
+.type-settings .order-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.type-settings .order-buttons .secondary-action {
+  min-height: 32px;
+  width: 32px;
+  padding: 0;
+}
+
+.type-settings td .primary-action.slim {
+  min-height: 36px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.direction-tag {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.direction-tag.increase {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.direction-tag.decrease {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.direction-tag.count {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+.type-settings .check-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

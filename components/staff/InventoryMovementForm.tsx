@@ -2,7 +2,12 @@
 
 import type { FormEvent, TouchEvent as ReactTouchEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CreateInventoryMovementInput, InventoryMovementType } from "@/lib/backend/api-types";
+import type {
+  CreateInventoryMovementInput,
+  InventoryMovementType,
+  InventoryMovementTypeOption
+} from "@/lib/backend/api-types";
+import { defaultInventoryMovementTypes, SALE_MOVEMENT_CODE } from "@/lib/domain/inventory";
 import { counters as fallbackCounters, products as fallbackProducts } from "@/lib/domain/sample-data";
 import { PurchaseModal } from "@/components/shared/PurchaseModal";
 import { COUNTER_CHANGED_EVENT, getSelectedCounterId } from "@/lib/shared/counter-preference";
@@ -41,24 +46,6 @@ type InventorySummary = {
   stock: number;
 };
 
-const movementOptions: Array<{ value: InventoryMovementType; label: string }> = [
-  { value: "opening_count", label: "開班盤點" },
-  { value: "handover_count", label: "交班盤點" },
-  { value: "closing_count", label: "下班盤點" },
-  { value: "purchase", label: "進貨" },
-  { value: "sampling", label: "試吃" },
-  { value: "waste", label: "報廢" },
-  { value: "adjustment", label: "轉調" },
-  { value: "preorder_pickup", label: "預購取貨" }
-];
-
-const countTypes = new Set<InventoryMovementType>([
-  "opening_count",
-  "closing_count",
-  "handover_count"
-]);
-const noteRequiredTypes = new Set<InventoryMovementType>(["sampling", "waste", "adjustment"]);
-
 const fallbackItems: ItemOption[] = fallbackProducts
   .filter((product) => product.category === "bag")
   .map((product) => ({
@@ -72,6 +59,9 @@ export function InventoryMovementForm() {
   const [items, setItems] = useState<ItemOption[]>(fallbackItems);
   const [counters, setCounters] = useState(fallbackCounters);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [movementTypes, setMovementTypes] = useState<InventoryMovementTypeOption[]>(
+    defaultInventoryMovementTypes
+  );
   const [summary, setSummary] = useState<InventorySummary[]>([]);
   const [movementType, setMovementType] = useState<InventoryMovementType>("opening_count");
   const [itemKey, setItemKey] = useState(fallbackItems[0]?.key ?? "");
@@ -91,8 +81,15 @@ export function InventoryMovementForm() {
   const [recordType, setRecordType] = useState<"all" | InventoryMovementType>("all");
   const [me, setMe] = useState<{ id: string; role: "staff" | "manager" } | null>(null);
 
-  const requiresCount = countTypes.has(movementType);
-  const requiresNote = noteRequiredTypes.has(movementType);
+  const currentType = movementTypes.find((type) => type.code === movementType);
+  const requiresCount = currentType?.direction === "count";
+  const requiresNote = Boolean(currentType?.noteRequired);
+  // 紀錄篩選列出所有手動類型(含已停用,舊紀錄仍要能篩);新增表單只列啟用中的,
+  // 編輯舊紀錄時保留它原本的類型讓下拉能正確顯示。
+  const recordTypeOptions = movementTypes.filter((type) => type.code !== SALE_MOVEMENT_CODE);
+  const formTypeOptions = recordTypeOptions.filter(
+    (type) => type.isActive || (editingId && type.code === movementType)
+  );
 
   useEffect(() => {
     setCounterId(getSelectedCounterId());
@@ -134,15 +131,22 @@ export function InventoryMovementForm() {
     counters.find((counter) => counter.id === counterId)?.name ?? counters[0]?.name ?? "";
 
   async function loadCatalog() {
-    const [catalogResult, meResult] = await Promise.all([
+    const [catalogResult, meResult, typesResult] = await Promise.all([
       fetch("/api/catalog").then((response) => response.json()),
       fetch("/api/me")
+        .then((response) => response.json())
+        .catch(() => null),
+      fetch("/api/inventory-movement-types")
         .then((response) => response.json())
         .catch(() => null)
     ]);
 
     if (meResult?.ok) {
       setMe({ id: meResult.data.id, role: meResult.data.role });
+    }
+
+    if (typesResult?.ok) {
+      setMovementTypes(typesResult.data.movementTypes ?? defaultInventoryMovementTypes);
     }
 
     if (!catalogResult.ok) return;
@@ -405,9 +409,9 @@ export function InventoryMovementForm() {
             value={movementType}
             onChange={(event) => setMovementType(event.target.value as InventoryMovementType)}
           >
-            {movementOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
+            {formTypeOptions.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.name}
               </option>
             ))}
           </select>
@@ -435,7 +439,7 @@ export function InventoryMovementForm() {
               value={quantity}
               onChange={(event) => setQuantity(event.target.value)}
             />
-            <small>盤點不需填異動量；試吃、報廢、轉調、預購取貨會自動扣庫存。</small>
+            <small>盤點不需填異動量；扣庫存的類型（如試吃、報廢）會自動轉成負數。</small>
           </label>
           <label className="field">
             <span>實際盤點庫存{requiresCount ? "" : "（可留空）"}</span>
@@ -569,9 +573,9 @@ export function InventoryMovementForm() {
                     }
                   >
                     <option value="all">全部</option>
-                    {movementOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
+                    {recordTypeOptions.map((option) => (
+                      <option key={option.code} value={option.code}>
+                        {option.name}
                       </option>
                     ))}
                   </select>
