@@ -82,10 +82,7 @@ export function PosRegister() {
     fallbackCounters.map((counter) => ({ id: counter.id, name: counter.name }))
   );
   const [counterId, setCounterId] = useState("");
-  const [onDutySellers, setOnDutySellers] = useState<
-    Array<{ id: string; displayName: string }>
-  >([]);
-  const [onDutyKnown, setOnDutyKnown] = useState(false);
+  const [sellerName, setSellerName] = useState("");
   const [pendingGift, setPendingGift] = useState<Product | null>(null);
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [flavorNotice, setFlavorNotice] = useState("");
@@ -104,6 +101,7 @@ export function PosRegister() {
 
     window.addEventListener(COUNTER_CHANGED_EVENT, onCounterChanged);
     void loadCatalog();
+    void loadSellerName();
 
     return () => window.removeEventListener(COUNTER_CHANGED_EVENT, onCounterChanged);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,28 +110,17 @@ export function PosRegister() {
   useEffect(() => {
     if (counterId) {
       void loadStock(counterId);
-      void loadOnDuty(counterId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [counterId]);
 
-  async function loadOnDuty(targetCounterId: string) {
+  async function loadSellerName() {
     try {
-      const result = await fetch(`/api/shifts/on-duty?counterId=${targetCounterId}`).then(
-        (response) => response.json()
-      );
+      const result = await fetch("/api/me").then((response) => response.json());
 
-      if (result.ok && result.data.source === "supabase") {
-        setOnDutySellers(result.data.sellers ?? []);
-        setOnDutyKnown(true);
-        return;
-      }
-
-      setOnDutySellers([]);
-      setOnDutyKnown(false);
+      if (result.ok) setSellerName(result.data.displayName ?? "");
     } catch {
-      setOnDutySellers([]);
-      setOnDutyKnown(false);
+      setSellerName("");
     }
   }
 
@@ -557,11 +544,8 @@ export function PosRegister() {
         return;
       }
 
-      const sellerLabel =
-        (result.data.sellers as string[] | undefined)?.join("、") || "記在你名下";
-
       setNotice(
-        `訂單完成：${sellerLabel} / ${resolvePaymentLabel(paymentMethod, paymentMethods)} / 應收 $${totals.receivableAmount}`
+        `訂單完成：${sellerName || "記在你名下"} /${resolvePaymentLabel(paymentMethod, paymentMethods)} / 應收 $${totals.receivableAmount}`
       );
       setCart([]);
       setManualDiscount("");
@@ -734,16 +718,9 @@ export function PosRegister() {
               </label>
             </div>
             <label className="field">
-              <span>銷售人員（依班表自動帶入）</span>
+              <span>銷售人員（業績歸登記者）</span>
               <input
-                value={
-                  onDutySellers.length > 0
-                    ? onDutySellers.map((seller) => seller.displayName).join("、") +
-                      (onDutySellers.length > 1 ? "（共班，業績各半）" : "")
-                    : onDutyKnown
-                      ? "目前無排班，將記在你名下"
-                      : "依登入者記錄"
-                }
+                value={sellerName || "依登入者記錄"}
                 disabled
                 readOnly
               />

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import type { CreateOrderInput } from "@/lib/backend/api-types";
 import { requireRole } from "@/lib/auth/guards";
 import { computeOrderBundleDiscount } from "@/lib/backend/bundles";
-import { getOnDutySellers } from "@/lib/backend/on-duty";
 import {
   nextDay,
   relationDisplayName,
@@ -359,20 +358,15 @@ export async function POST(request: Request) {
 
   let sellerId: string;
   let seller2Id: string | null;
-  let sellerNames: string[] = [];
 
   if (isBackfill) {
     sellerId = input.sellerId as string;
     seller2Id = input.seller2Id ?? null;
   } else {
-    // 銷售人員不由前端指定:依訂單成立當下的已發布班表帶入當班人員(共班掛兩人),
-    // 無人當班時記在登入者名下。收銀一律等於主銷售。
-    const onDuty = await getOnDutySellers(supabase, input.counterId);
-    const fallbackSellerId =
-      guard.profile?.id ?? process.env.DEMO_CASHIER_ID ?? defaultCashierId;
-    sellerId = onDuty[0]?.id ?? fallbackSellerId;
-    seller2Id = onDuty[1]?.id ?? null;
-    sellerNames = onDuty.map((seller) => seller.displayName);
+    // 銷售人員不由前端指定:業績一律歸登記這筆訂單的登入者,不再依班表共班均分。
+    // 收銀一律等於主銷售。
+    sellerId = guard.profile?.id ?? process.env.DEMO_CASHIER_ID ?? defaultCashierId;
+    seller2Id = null;
   }
 
   const bundleDiscount = await computeOrderBundleDiscount(
@@ -402,7 +396,6 @@ export async function POST(request: Request) {
     ok: true,
     data: {
       orderId: data,
-      sellers: sellerNames,
       source: "supabase"
     }
   });

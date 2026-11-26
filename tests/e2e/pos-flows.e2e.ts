@@ -117,8 +117,8 @@ describe("目錄與當班判定", () => {
   });
 });
 
-describe("下單:共班歸屬 / 轉帳 / 組合價 / 手動扣款", () => {
-  it("員工下單自動掛當班兩人,收銀=主銷售,轉帳可用", async () => {
+describe("下單:登記者歸屬 / 轉帳 / 組合價 / 手動扣款", () => {
+  it("員工下單業績歸登記者(即使共班也不均分),收銀=主銷售,轉帳可用", async () => {
     const created = await staff.post("/api/orders", {
       counterId,
       discountId: null,
@@ -130,7 +130,8 @@ describe("下單:共班歸屬 / 轉帳 / 組合價 / 手動扣款", () => {
 
     const [order] = await fetchOrders();
     sharedOrderId = order.id;
-    expect([order.sellerName, order.seller2Name].sort()).toEqual(["林小芸", "陳柏宇"]);
+    expect(order.sellerName).toBe("林小芸");
+    expect(order.seller2Name).toBe("");
     expect(order.cashierName).toBe(order.sellerName);
     expect(order.paymentLabel).toBe("轉帳");
     expect(order.receivedAmount).toBe(320);
@@ -219,7 +220,7 @@ describe("店長補單與防偽造", () => {
     ).toBe(yesterdayTaipei);
   });
 
-  it("員工帶 sellerId 與過去日期會被忽略,照班表歸屬", async () => {
+  it("員工帶 sellerId 與過去日期會被忽略,歸登記者", async () => {
     const created = await staff.post("/api/orders", {
       counterId,
       sellerId: SEED.staffC,
@@ -235,7 +236,7 @@ describe("店長補單與防偽造", () => {
     const orders = await fetchOrders();
     const spoof = orders.find((order: any) => order.note === "spoof");
     expect(spoof.sellerName).not.toBe("黃品安");
-    expect(["林小芸", "陳柏宇"]).toContain(spoof.sellerName);
+    expect(spoof.sellerName).toBe("林小芸");
     expect(
       new Date(spoof.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" })
     ).toBe(taipeiToday());
@@ -384,17 +385,18 @@ describe("報表與作廢", () => {
     expect(result.ok).toBe(true);
     const data = result.data as any;
 
-    // 6 筆:共班餅乾 320 + 組合 900 + 手動扣款 220 + 補單 320 + spoof 320 + 發禮盒 980
+    // 6 筆:餅乾 320 + 組合 900 + 手動扣款 220 + 補單 320 + spoof 320 + 發禮盒 980
     expect(data.summary.orderCount).toBe(6);
     expect(data.summary.receivedAmount).toBe(3060);
     expect(data.summary.discountAmount).toBe(560); // 組合 220+60 + 手動 280
 
-    // 今天的共班訂單:林小芸與陳柏宇的實收應相等(各半)
+    // 今天員工登記的訂單全歸林小芸;同班的陳柏宇不分業績
     const today = taipeiToday();
     const todayRows = data.daily.filter((row: any) => row.date === today);
     const staffARow = todayRows.find((row: any) => row.sellerName === "林小芸");
     const staffBRow = todayRows.find((row: any) => row.sellerName === "陳柏宇");
-    expect(staffARow.receivedAmount).toBe(staffBRow.receivedAmount);
+    expect(staffARow.receivedAmount).toBeGreaterThan(0);
+    expect(staffBRow).toBeUndefined();
     expect(staffARow.commissionMode).toBeDefined();
 
     // 補單歸黃品安
